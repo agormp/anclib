@@ -1,9 +1,17 @@
-import phylotreelib as pt
-import sequencelib
-import re
-import math
 import collections
+import math
+import re
+
+import sequencelib
+import phylotreelib as pt
+
 import numpy as np
+import pandas as pd
+import rpy2
+import rpy2.robjects as robjects
+from rpy2.robjects.packages import importr
+from rpy2.robjects import pandas2ri
+from rpy2.robjects.conversion import localconverter
 
 ###################################################################################################
 ###################################################################################################
@@ -83,17 +91,11 @@ class Baseml_rstfile():
 
     ###############################################################################################
 
-    def __init__(self, filename=None, filecontent=None):
+    def __init__(self, filename=None):
         """Check file contains needed info about tree and sequences.
         Construct dictionaries mapping between nodeID, seqname, and index"""
 
-        num_args = (filename is not None) + (filecontent is not None)
-        if num_args != 1:
-            raise AnclibError("Baseml_rstfile __init__ requires either filename or filecontent (not both)")
-        elif filecontent:
-            self.rstfile = StringIO(filecontent)
-        else:
-            self.rstfile = open(filename, mode="rt", encoding="UTF-8")
+        self.rstfile = open(filename, mode="rt", encoding="UTF-8")
         
         self._read_until("^Ancestral reconstruction by BASEML")
         self.rstfile.readline()
@@ -284,6 +286,82 @@ class MBASR_file():
     Ancestral sequences (corresponding to internal nodes on tree) are named based on nodeIDs.
     The method also returns
     """
+    
+    def __init__(self, treefile, intnodefile, leafstatefile):
+        """Read files, store as dataframes, ready for further parsing.
+        Tree is read as dataframe (so we have info about internal nodeIDs):
+            parent, node, branch.length,	label
+        Intnode reconstructions are read as dataframe:
+            nodeid, pstate1, pstate2
+        Leafnode states read as dataframe:
+            leafnodeid, state
+        """ 
+        
+        # Read treefile, store branch info as pandas dataframe
+        # Note: I am cargo culting the rpy2 code here...
+        # Format: 
+        ape = importr("ape")
+        tidytree = importr("tidytree")    
+        tree = ape.read_tree(treefile)
+        dftreeR = tidytree.as_tibble_phylo(tree)
+        with localconverter(robjects.default_converter + pandas2ri.converter):
+            self.dftreePy = robjects.conversion.rpy2py(dftreeR)
+        self.nseq = self.dftreePy.shape[0]
+        
+        # Read internal node ancestral reconstruction state info
+        self.intnodestate = pd.read_csv(intnodefile, delim_whitespace=True,
+                                        header=None, names=["nodeID","pstate0","pstate1"])
+        self.nintnode = self.intnodestate.shape[0]
+        
+        # Read leaf node state info
+        self.leafnodestate = pd.read_csv(leafstatefile, delim_whitespace=True,
+                                        header=None, names=["leafID","state"])
+        self.nleaf = self.leafnodestate.shape[0]
+        
+    ###########################################################################################
+
+    def read_tree(self):
+        parentlist = []
+        childlist = []
+        
+        for i in range(self.nseq):
+            parent, node, label = self.dftreePy.iloc[i,[0,1,3]]
+            # Tidy tree df has one row where root is both parent and node: Discard.
+            if parent != node:
+                parentlist.append(parent)
+                # Tidytree parent is either leafname (type: string) or 
+                # NA_character_ (type: rpy2.rinterface_lib.sexp.NACharacterType)
+                if type(label) == str:
+                    childlist.append(label)
+                else:
+                    childlist.append(node)
+        tree = pt.Tree.from_branchinfo(parentlist, childlist)
+        return tree
+
+    ###########################################################################################
+
+    def read_trait(self):
+        nodeidlist = list(self.leafnodestate["leafID"])
+        intnodeidlist = [int(x.replace("node","")) for x in self.intnodestate["nodeID"]]
+        nodeidlist.extend(intnodeidlist)
+        
+        traitstatelist = list(self.leafnodestate["state"])
+        traitproblist = [1.0] * self.nleaf
+        intnodestatelist = []
+        intproblist = []
+        for i in range(self.nintnode):
+            p0, p1 = self.dftreePy.iloc[i,[1,2]]
+            if p0 > 0.5:
+                intnodestatelist.append(0)
+                intproblist.append(p0)
+            else:
+                intnodestatelist.append(1)
+                intproblist.append(p1)
+        traitstatelist.extend(intnodestatelist)
+        traitproblist.extend(intproblist)
+        
+        
+
 ###################################################################################################
 ###################################################################################################
 
