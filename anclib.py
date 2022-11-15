@@ -350,7 +350,8 @@ class MBASR_file():
         intnodestatelist = []
         intproblist = []
         for i in range(self.nintnode):
-            p0, p1 = self.dftreePy.iloc[i,[1,2]]
+            p0, p1 = self.intnodestate.iloc[i,[1,2]]
+            print(p0,p1) #DEBUG
             if p0 > 0.5:
                 intnodestatelist.append(0)
                 intproblist.append(p0)
@@ -360,7 +361,10 @@ class MBASR_file():
         traitstatelist.extend(intnodestatelist)
         traitproblist.extend(intproblist)
         
+        traitdict = dict(zip(nodeidlist, traitstatelist))
+        traitprobdict = dict(zip(nodeidlist, traitproblist))
         
+        return (traitdict, traitprobdict)
 
 ###################################################################################################
 ###################################################################################################
