@@ -43,34 +43,49 @@ class Anc_recon():
         self.tree = None
         self.alignment = None
         self.seqprobs = None
-        self.traitdict = None
-        self.traitprobs = None
+        self.trait = {}
+        self.traitprobs = {}
         
     ###############################################################################################
 
-    def add_from_basemlrst(self, filename):
-        """Add information from BASEML rst file: 
+    @classmethod
+    def from_baseml_mbasr(cls, baseml_rstfile, 
+                              mbasr_treefile, mbasr_intnodefile, mbasr_leafstatefile):
+        """Combine information from BASEML rst file, and MBASR ancestral state reconstruction
+        
+        The following attributes are added:
             tree
-            sequences (including ancestral reconstructions)
-            probabilities for seq residues (2D numpy array)
-            dicts mappings between nodeid (from tree) and seqname
-            dicts mapping between array row index and seqname
+            alignment of sequences, including ancestral reconstructions. Seqname = str(nodeid)
+            probabilities for seq residues (dict of nodeid:numpy array)
+            trait state (dict of nodeid:state)
+            trait state probabillity (dict of nodeid:state probability)
+                              
+        The nodeids used by MBASR are changed to match those 
         """
         
-        bf = Baseml_rstfile(filename)
-        self.tree = bf.read_tree()
-        self.alignment, self.seqprobs = bf.read_alignment()
+        obj = cls()
+        ba_file = _Baseml_rstfile(baseml_rstfile)
+        obj.tree = ba_file.read_tree()
+        obj.alignment, obj.seqprobs = ba_file.read_alignment()
         
-    ###############################################################################################
-
-    def add_from_mbasr(self,filename):
-        pass
+        mb_file = _MBASR_file(mbasr_treefile, mbasr_intnodefile, mbasr_leafstatefile)
+        mb_tree = mb_file.read_tree()
+        mb_trait, mb_probs = mb_file.read_trait()
         
+        mbnode2banode, unmatch_baseml, unmatch_mbasr = mb_tree.match_intnodes(obj.tree)
+        if (unmatch_baseml != None) or (unmatch_mbasr != None):
+            raise AncError("BASEML and MBASR trees are rooted differently. Cannot merge info")
+        for leafnode in obj.tree.leaves:
+            mbnode2banode[leafnode] = leafnode      # Useful in for-loop below
+        for mbnode,banode in mbnode2banode.items():
+            obj.trait[banode] = mb_trait[mbnode]
+            obj.traitprobs[banode] = mb_probs[mbnode]
+        return obj
 
 ###################################################################################################
 ###################################################################################################
 
-class Baseml_rstfile():
+class _Baseml_rstfile():
     """Class representing parser for BASEML rst file. 
     
     Methods for extracing tree, alignment, and residue probabilities for ancestral 
@@ -237,7 +252,7 @@ class Baseml_rstfile():
 ###################################################################################################
 ###################################################################################################
 
-class MBASR_file():
+class _MBASR_file():
     """Class representing parser for MBASR ancestral reconstruction file. 
     
     Methods for extracing one tree and one alignment of ancestral (and contemporaneous) sequences.
