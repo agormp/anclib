@@ -112,19 +112,25 @@ class Baseml_rstfile():
         self.nseq = int(tmp[0].split()[3])
         
         # Find first line of seqinfo. Pattern like "   1     86   AAAAAAAAAAAAA"
+        # The find last line of seqinfo to get seqlen
         _,self.startofseqpos = self._read_until("^\s*1\s+[0-9]+\s+[A-Z]+")
         tmp,_ = self._read_until("^\n",nsave=2)
         self.seqlen = int(tmp[0].split()[0])
-        
-        #### NEED TO FIND SEQTYPE!!!!!
-        
+                
         # Note: nodenums start at 1, not 0 (this is BASEML node-numbering scheme)
         self.nodeid2nodenum, self.nodenum2nodeid = self._map_nodeid_nodenum()
         self.nodeid2seqname, self.seqname2nodeid = self._map_nodeid_name()
         self.nodenum2seqname, self.seqname2nodenum = self._map_nodenum_name()
         self.i2seqname, self.seqname2i = self._map_i_seqname()
+        self.i2nodeid, self.nodeid2i = self._map_i_nodeid()
         self.seqnames = set(self.seqname2nodeid.keys())
+        self.nodeids = set(self.nodeid2nodenum.keys())
                 
+    ###########################################################################################
+
+    def close(self):
+        self.rstfile.close()
+
     ###########################################################################################
 
     def _map_nodeid_nodenum(self):
@@ -177,6 +183,17 @@ class Baseml_rstfile():
         
     ###########################################################################################
 
+    def _map_i_nodeid(self):
+        i2nodeid = {}
+        nodeid2i = {}
+        for i,seqname in self.i2seqname.items():
+            nodeid = self.seqname2nodeid[seqname]
+            i2nodeid[i] = nodeid
+            nodeid2i[nodeid] = i
+        return (i2nodeid, nodeid2i)
+        
+    ###########################################################################################        
+
     def read_tree(self):
         """Extracts tree from branch info and Newick string. Returns phylotreelib.Tree object"""
         
@@ -202,9 +219,8 @@ class Baseml_rstfile():
         """Extracts sequence information corresponding to extant and ancestral sequences.
         Returns sequencelib.Seq_alignment object and 2D numpy array with residue probs"""
         
-        # Initialise lists of nseq empty lists to keep sequence and prob info
         seqlists = [ [] for i in range(self.nseq)]
-        seqprobs = np.zeros((self.nseq, self.seqlen))
+        seqprobs = {nodeid:np.zeros(self.seqlen) for nodeid in self.nodeids}
         
         # Move filepointer to first line of sequence info
         self.rstfile.seek(self.startofseqpos)
@@ -217,7 +233,8 @@ class Baseml_rstfile():
             for i,res in enumerate(residues):
                 seqlists[i].append(res)
             for i,prob in enumerate(probs):
-                seqprobs[i,site-1] = prob
+                nodeid = self.i2nodeid[i]
+                seqprobs[nodeid][site-1] = prob
                 
         # Determine seqtype from first seq (assume it is representative)
         seqtype = sequencelib.find_seqtype(seqlists[0])
@@ -351,7 +368,6 @@ class MBASR_file():
         intproblist = []
         for i in range(self.nintnode):
             p0, p1 = self.intnodestate.iloc[i,[1,2]]
-            print(p0,p1) #DEBUG
             if p0 > 0.5:
                 intnodestatelist.append(0)
                 intproblist.append(p0)
@@ -369,7 +385,4 @@ class MBASR_file():
 ###################################################################################################
 ###################################################################################################
 
-
-###################################################################################################
-###################################################################################################
 
