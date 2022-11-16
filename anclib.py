@@ -45,10 +45,6 @@ class Anc_recon():
         self.seqprobs = None
         self.traitdict = None
         self.traitprobs = None
-        self.nodeid2seqname = None
-        self.seqname2nodeid = None
-        self.i2seqname = None
-        self.seqname2i = None
         
     ###############################################################################################
 
@@ -64,8 +60,6 @@ class Anc_recon():
         bf = Baseml_rstfile(filename)
         self.tree = bf.read_tree()
         self.alignment, self.seqprobs = bf.read_alignment()
-        self.nodeid2seqname, self.seqname2nodeid = bf.nodeid2seqname, bf.seqname2nodeid
-        self.i2seqname, self.seqname2i = bf.i2seqname, bf.seqname2i
         
     ###############################################################################################
 
@@ -119,11 +113,6 @@ class Baseml_rstfile():
                 
         # Note: nodenums start at 1, not 0 (this is BASEML node-numbering scheme)
         self.nodeid2nodenum, self.nodenum2nodeid = self._map_nodeid_nodenum()
-        self.nodeid2seqname, self.seqname2nodeid = self._map_nodeid_name()
-        self.nodenum2seqname, self.seqname2nodenum = self._map_nodenum_name()
-        self.i2seqname, self.seqname2i = self._map_i_seqname()
-        self.i2nodeid, self.nodeid2i = self._map_i_nodeid()
-        self.seqnames = set(self.seqname2nodeid.keys())
         self.nodeids = set(self.nodeid2nodenum.keys())
                 
     ###########################################################################################
@@ -145,53 +134,6 @@ class Baseml_rstfile():
         nodeid2nodenum = {val:key for key,val in nodenum2nodeid.items()}
         return (nodeid2nodenum, nodenum2nodeid)
 
-    ###########################################################################################
-    
-    def _map_nodeid_name(self):
-        nodeid2seqname = {} 
-        seqname2nodeid = {}
-        ndigits = math.ceil(math.log10(self.nseq))
-        for nodenum,nodeid in self.nodenum2nodeid.items():
-            if nodeid == nodenum:
-                name = "seq_{1:0{0}}".format(ndigits, nodeid)
-            else:
-                name = nodeid
-            nodeid2seqname[nodeid] = name
-            seqname2nodeid[name] = nodeid
-        return (nodeid2seqname, seqname2nodeid)
-
-    ###########################################################################################
-    
-    def _map_nodenum_name(self):
-        nodenum2seqname = {} 
-        seqname2nodenum = {}
-        for nodenum,nodeid in self.nodenum2nodeid.items():
-            seqname = self.nodeid2seqname[nodeid]
-            nodenum2seqname[nodenum] = seqname
-            seqname2nodenum[seqname] = nodenum
-        return (nodenum2seqname, seqname2nodenum)
-
-    ###########################################################################################
-
-    def _map_i_seqname(self):
-        i2seqname = {}
-        seqname2i = {}
-        for nodenum,seqname in self.nodenum2seqname.items():
-            i2seqname[nodenum - 1] = seqname
-            seqname2i[seqname] = nodenum - 1
-        return (i2seqname, seqname2i)
-        
-    ###########################################################################################
-
-    def _map_i_nodeid(self):
-        i2nodeid = {}
-        nodeid2i = {}
-        for i,seqname in self.i2seqname.items():
-            nodeid = self.seqname2nodeid[seqname]
-            i2nodeid[i] = nodeid
-            nodeid2i[nodeid] = i
-        return (i2nodeid, nodeid2i)
-        
     ###########################################################################################        
 
     def read_tree(self):
@@ -233,7 +175,8 @@ class Baseml_rstfile():
             for i,res in enumerate(residues):
                 seqlists[i].append(res)
             for i,prob in enumerate(probs):
-                nodeid = self.i2nodeid[i]
+                nodenum = i + 1
+                nodeid = self.nodenum2nodeid[nodenum]
                 seqprobs[nodeid][site-1] = prob
                 
         # Determine seqtype from first seq (assume it is representative)
@@ -245,7 +188,9 @@ class Baseml_rstfile():
         alignment = sequencelib.Seq_alignment(seqtype=seqtype)
         for i in range(self.nseq):
             seq = "".join(seqlists[i])
-            name = self.i2seqname[i]
+            nodenum = i + 1
+            nodeid = self.nodenum2nodeid[nodenum]
+            name = str(nodeid)      # Leaves are already strings, so no effect on those
             if seqtype == "DNA":
                 seqobject = sequencelib.DNA_sequence(name, seq)
             else:
