@@ -1,7 +1,7 @@
 # anclib: python library for analyzing ancestral reconstructions of sequences on phylogenies
 
 [![PyPI downloads](https://static.pepy.tech/personalized-badge/anclib?period=total&units=none&left_color=black&right_color=blue&left_text=downloads&service=github)](https://pepy.tech/project/anclib)
-![](https://img.shields.io/badge/version-0.1.2-blue)
+![](https://img.shields.io/badge/version-0.2.0-blue)
 
 Using classes and methods in anclib.py it is possible to parse and analyze text files containing results related to ancestral reconstruction of DNA or protein sequences. (Rudimentary - beginning of project)
 
