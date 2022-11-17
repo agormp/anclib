@@ -16,7 +16,7 @@ from rpy2.robjects.conversion import localconverter
 ###################################################################################################
 ###################################################################################################
 
-class AnclibError(Exception):
+class AncError(Exception):
     pass
 
 ###################################################################################################
@@ -45,12 +45,15 @@ class Anc_recon():
         self.seqprobs = None
         self.trait = {}
         self.traitprobs = {}
+        self.nodes = None
+        self.sortednodes = None
         
     ###############################################################################################
 
     @classmethod
     def from_baseml_mbasr(cls, baseml_rstfile, 
-                              mbasr_treefile, mbasr_intnodefile, mbasr_leafstatefile):
+                              mbasr_treefile, mbasr_intnodefile, mbasr_leafstatefile,
+                              state0="state_0", state1="state_1"):
         """Combine information from BASEML rst file, and MBASR ancestral state reconstruction
         
         The following attributes are added:
@@ -60,7 +63,7 @@ class Anc_recon():
             trait state (dict of nodeid:state)
             trait state probabillity (dict of nodeid:state probability)
                               
-        The nodeids used by MBASR are changed to match those 
+        The nodeids used by MBASR are changed to match those used by BASEML
         """
         
         obj = cls()
@@ -68,9 +71,12 @@ class Anc_recon():
         obj.tree = ba_file.read_tree()
         obj.alignment, obj.seqprobs = ba_file.read_alignment()
         
-        mb_file = _MBASR_file(mbasr_treefile, mbasr_intnodefile, mbasr_leafstatefile)
+        mb_file = _MBASR_file(mbasr_treefile, mbasr_intnodefile, mbasr_leafstatefile, state0, state1)
         mb_tree = mb_file.read_tree()
         mb_trait, mb_probs = mb_file.read_trait()
+        obj.nodes = mb_tree.nodes
+        obj.sortednodes = sorted(list(mb_tree.leaves))
+        obj.sortednodes.extend(sorted(list(mb_tree.intnodes)))
         
         mbnode2banode, unmatch_baseml, unmatch_mbasr = mb_tree.match_intnodes(obj.tree)
         if (unmatch_baseml != None) or (unmatch_mbasr != None):
@@ -81,6 +87,44 @@ class Anc_recon():
             obj.trait[banode] = mb_trait[mbnode]
             obj.traitprobs[banode] = mb_probs[mbnode]
         return obj
+        
+    ###############################################################################################
+    
+    def nodeinfo(self, varseq=False, poslist=None, zeroindex=True):
+        """Outputs one line per node with following informations: nodeid  traitstate  seqstates
+        option varseq=True (default) outputs only variable sites from sequences.
+        Can also explicitly provide poslist of sites to be printed. Indexing of residue sites
+        can start at 0 (zeroindex=True) or 1 (zeroindex=False)"""
+        
+        pos = None
+        if varseq and poslist:
+            raise AncError("Specify either varseq or poslist option - not both")
+        if varseq:
+            pos = self.alignment.varcols()
+        elif poslist:
+            pos = poslist
+            
+        if pos and not zeroindex:
+            pos = [p - 1 for p in pos]
+            
+        for nodeid in self.sortednodes:
+            seqname = str(nodeid)
+            trait = self.trait[nodeid]
+            if pos:
+                seq = self.alignment.getseq(seqname).subseqpos(pos).seq
+            else:
+                seq = self.alignment.getseq(seqname).seq
+            print("{}\t{}\t{}".format(nodeid, self.trait[nodeid], seq))
+    
+    ###############################################################################################
+    
+    def nodeinfo(self, varseq=False, poslist=None, zeroindex=True):
+        """Outputs one line per node with following informations: nodeid  traitstate  seqstates
+        option varseq=True (default) outputs only variable sites from sequences.
+        Can also explicitly provide poslist of sites to be printed. Indexing of residue sites
+        can start at 0 (zeroindex=True) or 1 (zeroindex=False)"""
+        
+
 
 ###################################################################################################
 ###################################################################################################
@@ -197,7 +241,7 @@ class _Baseml_rstfile():
         # Determine seqtype from first seq (assume it is representative)
         seqtype = sequencelib.find_seqtype(seqlists[0])
         if seqtype not in ["DNA", "protein"]:
-            raise AnclibError("Expecting either DNA or protein seqtype. Actual seqtype: {}".format(seqtype))
+            raise AncError("Expecting either DNA or protein seqtype. Actual seqtype: {}".format(seqtype))
                 
         # Create alignment from lists of residues in seqs
         alignment = sequencelib.Seq_alignment(seqtype=seqtype)
@@ -242,7 +286,7 @@ class _Baseml_rstfile():
             line = self.rstfile.readline()
             if line == "":
                 msg = "BASEML rst file format not as expected"
-                raise AnclibError(msg)
+                raise AncError(msg)
             if nsave > 0:
                 lastnlines.append(line)
                 lastnlines.popleft()
@@ -264,7 +308,7 @@ class _MBASR_file():
     The method also returns
     """
     
-    def __init__(self, treefile, intnodefile, leafstatefile):
+    def __init__(self, treefile, intnodefile, leafstatefile, state0, state1):
         """Read files, store as dataframes, ready for further parsing.
         Tree is read as dataframe (so we have info about internal nodeIDs):
             parent, node, branch.length,	label
@@ -294,6 +338,8 @@ class _MBASR_file():
         self.leafnodestate = pd.read_csv(leafstatefile, delim_whitespace=True,
                                         header=None, names=["leafID","state"])
         self.nleaf = self.leafnodestate.shape[0]
+        self.state0 = state0
+        self.state1 = state1
         
     ###########################################################################################
 
@@ -318,21 +364,22 @@ class _MBASR_file():
     ###########################################################################################
 
     def read_trait(self):
+        statenamedict = {0:self.state0, 1:self.state1}
         nodeidlist = list(self.leafnodestate["leafID"])
         intnodeidlist = [int(x.replace("node","")) for x in self.intnodestate["nodeID"]]
         nodeidlist.extend(intnodeidlist)
         
-        traitstatelist = list(self.leafnodestate["state"])
+        traitstatelist = [statenamedict[state] for state in self.leafnodestate["state"]]
         traitproblist = [1.0] * self.nleaf
         intnodestatelist = []
         intproblist = []
         for i in range(self.nintnode):
             p0, p1 = self.intnodestate.iloc[i,[1,2]]
             if p0 > 0.5:
-                intnodestatelist.append(0)
+                intnodestatelist.append(self.state0)
                 intproblist.append(p0)
             else:
-                intnodestatelist.append(1)
+                intnodestatelist.append(self.state1)
                 intproblist.append(p1)
         traitstatelist.extend(intnodestatelist)
         traitproblist.extend(intproblist)
