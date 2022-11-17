@@ -75,6 +75,7 @@ class Anc_recon():
         mb_tree = mb_file.read_tree()
         mb_trait, mb_probs = mb_file.read_trait()
         obj.nodes = mb_tree.nodes
+        obj.sortedintnodes = sorted(list(mb_tree.intnodes))
         obj.sortednodes = sorted(list(mb_tree.leaves))
         obj.sortednodes.extend(sorted(list(mb_tree.intnodes)))
         
@@ -91,9 +92,10 @@ class Anc_recon():
     ###############################################################################################
     
     def nodeinfo(self, varseq=False, poslist=None, zeroindex=True):
-        """Outputs one line per node with following informations: nodeid  traitstate  seqstates
+        """Outputs one line per node with following informations: 
+            nodeid  traitstate  seqstates
         option varseq=True (default) outputs only variable sites from sequences.
-        Can also explicitly provide poslist of sites to be printed. Indexing of residue sites
+        Can also explicitly provide poslist of sites to be printed. Indexing in poslist
         can start at 0 (zeroindex=True) or 1 (zeroindex=False)"""
         
         pos = None
@@ -114,17 +116,89 @@ class Anc_recon():
                 seq = self.alignment.getseq(seqname).subseqpos(pos).seq
             else:
                 seq = self.alignment.getseq(seqname).seq
-            print("{}\t{}\t{}".format(nodeid, self.trait[nodeid], seq))
+            print("{}\t{}\t{}".format(nodeid, trait, seq))
     
     ###############################################################################################
     
-    def nodeinfo(self, varseq=False, poslist=None, zeroindex=True):
-        """Outputs one line per node with following informations: nodeid  traitstate  seqstates
-        option varseq=True (default) outputs only variable sites from sequences.
-        Can also explicitly provide poslist of sites to be printed. Indexing of residue sites
-        can start at 0 (zeroindex=True) or 1 (zeroindex=False)"""
+    def branchinfo(self, varseq=False, poslist=None, zeroindex=True, 
+                    printif_traitdiff=False, printif_seqdiff=False):
+        """Outputs one line per branch with following informations: 
+            nodeid_from   nodeid_to   trait_from   trait_to   seq_from   seq_to
+        Option varseq=True (default) output only variable sites from sequences.
+        Option poslist: specify sites to be printed. 
+        Option zeroindex=True: Start indexing of poslist at 0 (otherwise start at 1)
+        Option printif_traitdiff=True: only print branches where traits differ
+        Option printif_seqdiff=True: only print branches where selected residues have changed"""
         
+        pos = None
+        if varseq and poslist:
+            raise AncError("Specify either varseq or poslist option - not both")
+        if varseq:
+            pos = self.alignment.varcols()
+        elif poslist:
+            pos = poslist
+    
+        if pos and not zeroindex:
+            pos = [p - 1 for p in pos]
+            
+        for nodefrom in self.sortedintnodes:
+            for nodeto in self.tree.children(nodefrom):     
+                seqnamefrom = str(nodefrom)
+                seqnameto = str(nodeto)
+                traitfrom = self.trait[nodefrom]
+                traitto = self.trait[nodeto]
+                if pos:
+                    seqfrom = self.alignment.getseq(seqnamefrom).subseqpos(pos).seq
+                    seqto = self.alignment.getseq(seqnameto).subseqpos(pos).seq
+                else:
+                    seqfrom = self.alignment.getseq(seqnamefrom).seq
+                    seqto = self.alignment.getseq(seqnameto).seq
 
+                # Could test for traitdiff before setting seq, but neater code this way...
+                printbranch = True       
+                if printif_traitdiff and (traitfrom==traitto):
+                    printbranch = False
+                if printif_seqdiff and (seqfrom==seqto):
+                    printbranch = False
+                if printbranch:
+                    print("{}\t{}\t{}\t{}\t{}\t{}".format(
+                           nodefrom, nodeto, traitfrom, traitto, seqfrom, seqto))
+
+    ###############################################################################################
+    
+    def branchdiff(self, zeroindex=True, printif_traitdiff=False):
+        """Prints one line of output for each sequence change on all branches of the tree:
+            node_from   node_to   site  trait_from   trait_to   residue_from   residue_to
+        Here 'site' is the index of the sequence residue.
+        Option zeroindex=False causes numbering to start at 1 (otherwise at 0)
+        Option printif_traitdiff=True: only print branches where traits differ
+        """
+        
+        for nodefrom in self.sortedintnodes:
+            for nodeto in self.tree.children(nodefrom):     
+                seqnamefrom = str(nodefrom)
+                seqnameto = str(nodeto)
+                traitfrom = self.trait[nodefrom]
+                traitto = self.trait[nodeto]
+                seqfrom = self.alignment.getseq(seqnamefrom)
+                seqto = self.alignment.getseq(seqnameto)
+                difflist = seqfrom.seqdiff(seqto, zeroindex)
+
+                # Could test for traitdiff before setting seq, but neater code this way...
+                if (not printif_traitdiff) or (traitfrom!=traitto):
+                    for site,resfrom,resto in difflist:
+                        print("{}\t{}\t{}\t{}\t{}\t{}\t{}".format(
+                           nodefrom, nodeto, site, traitfrom, traitto, resfrom, resto))
+        
+    ###############################################################################################
+    
+    def varpos(self, zeroindex=True):
+        """Returns list of variable (unconserved) sites in alignment of sequences"""
+        
+        varpos = self.alignment.varcols()
+        if not zeroindex:
+            varpos = [pos+1 for pos in varpos]
+        return varpos
 
 ###################################################################################################
 ###################################################################################################
