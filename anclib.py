@@ -45,7 +45,7 @@ class Anc_recon():
         self.seqprobs = None
         self.trait = {}
         self.traitprobs = {}
-        self.nodes = None
+        self.sortedintnodes = None
         self.sortednodes = None
 
     ###############################################################################################
@@ -74,16 +74,15 @@ class Anc_recon():
         mb_file = _MBASR_file(mbasr_treefile, mbasr_intnodefile, mbasr_leafstatefile, state0, state1)
         mb_tree = mb_file.read_tree()
         mb_trait, mb_probs = mb_file.read_trait()
-        obj.nodes = mb_tree.nodes
-        obj.sortedintnodes = sorted(list(mb_tree.intnodes))
-        obj.sortednodes = sorted(list(mb_tree.leaves))
-        obj.sortednodes.extend(sorted(list(mb_tree.intnodes)))
+        obj.sortedintnodes = sorted(list(obj.tree.intnodes))
+        obj.sortednodes = sorted(list(obj.tree.leaves))
+        obj.sortednodes.extend(obj.sortedintnodes)
 
         mbnode2banode, unmatch_baseml, unmatch_mbasr = mb_tree.match_intnodes(obj.tree)
         if (unmatch_baseml != None) or (unmatch_mbasr != None):
             raise AncError("BASEML and MBASR trees are rooted differently. Cannot merge info")
         for leafnode in obj.tree.leaves:
-            mbnode2banode[leafnode] = leafnode      # Leaf names are same. Add to dict for looping purposes
+            mbnode2banode[leafnode] = leafnode      # Leaf names are same. Add to dict for looping
         for mbnode,banode in mbnode2banode.items():
             obj.trait[banode] = mb_trait[mbnode]
             obj.traitprobs[banode] = mb_probs[mbnode]
