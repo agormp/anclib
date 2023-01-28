@@ -116,16 +116,17 @@ class Anc_recon():
 
     ###############################################################################################
 
-    def nodeinfo(self, outfilename, varseq=False, poslist=None, zeroindex=True):
+    def nodeinfo(self, outfilename, varseq=False, poslist=None, zeroindex=True, probmin=None):
         """Writes results to 'outfilename':
         Output is one line per node in tree - with following informations:
-            nodeid  traitstate  seqstates
+            nodeid  traitstate  traitprob seqstates
         option varseq=True outputs only variable sites from sequences.
+        option probmin (if not None): Only print info for nodes with traitprob > probmin
         Can also explicitly provide poslist of sites to be printed. Indexing in poslist
         can start at 0 (zeroindex=True) or 1 (zeroindex=False)"""
 
         with open(outfilename, "w") as outfile:
-            outfile.write("# {}\t{}\t{}\n".format("nodeid", "trait", "seq"))
+            outfile.write("# {}\t{}\t{}\t{}\n".format("nodeid", "trait", "traitprob", "seq"))
             pos = None
             if varseq and poslist:
                 raise AncError("Specify either varseq or poslist option - not both")
@@ -138,30 +139,35 @@ class Anc_recon():
                 pos = [p - 1 for p in pos]
 
             for nodeid in self.sortednodes:
-                seqname = str(nodeid)
-                trait = self.trait[nodeid]
-                if pos:
-                    seq = self.alignment.getseq(seqname).subseqpos(pos).seq
-                else:
-                    seq = self.alignment.getseq(seqname).seq
-                outfile.write("{}\t{}\t{}\n".format(nodeid, trait, seq))
+                if (not probmin) or (self.traitprob[nodeid] > probmin):
+                    seqname = str(nodeid)
+                    trait = self.trait[nodeid]
+                    traitprob = self.traitprob[nodeid]
+                    if pos:
+                        seq = self.alignment.getseq(seqname).subseqpos(pos).seq
+                    else:
+                        seq = self.alignment.getseq(seqname).seq
+                    outfile.write(f"{nodeid}\t{trait}\t{traitprob:.3f}\t{seq}\n")
 
     ###############################################################################################
 
     def branchinfo(self, outfilename, varseq=False, poslist=None, zeroindex=True,
-                    printif_traitdiff=False, printif_seqdiff=False):
+                    printif_traitdiff=False, printif_seqdiff=False, probmin=None):
         """Writes results to 'outfilename':
-                    Outputs one line per branch with following informations:
-            nodeid_from   nodeid_to   trait_from   trait_to   seq_from   seq_to
+        Outputs one line per branch with following informations:
+          nodeid_from  nodeid_to  trait_from  trait_to  traitprob_from  traitprob_to seq_from  seq_to
         Option varseq=True (default) output only variable sites from sequences.
         Option poslist: specify sites to be printed.
         Option zeroindex=True: Start indexing of poslist at 0 (otherwise start at 1)
         Option printif_traitdiff=True: only print branches where traits differ
-        Option printif_seqdiff=True: only print branches where selected residues have changed"""
+        Option printif_seqdiff=True: only print branches where selected residues have changed
+        option probmin (if not None): Only print info where both nodes have traitprob > probmin
+        """
 
         with open(outfilename, "w") as outfile:
-            outfile.write("# {}\t{}\t{}\t{}\t{}\t{}\n".format(
-                   "node_from", "node_to", "trait_from", "trait_to", "seq_from", "seq_to"))
+            outfile.write("# {}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(
+                   "node_from", "node_to", "trait_from", "trait_to",
+                   "traitprob_from", "traitprob_to", "seq_from", "seq_to"))
             pos = None
             if varseq and poslist:
                 raise AncError("Specify either varseq or poslist option - not both")
@@ -175,56 +181,70 @@ class Anc_recon():
 
             for nodefrom in self.sortedintnodes:
                 for nodeto in self.tree.children(nodefrom):
-                    seqnamefrom = str(nodefrom)
-                    seqnameto = str(nodeto)
-                    traitfrom = self.trait[nodefrom]
-                    traitto = self.trait[nodeto]
-                    if pos:
-                        seqfrom = self.alignment.getseq(seqnamefrom).subseqpos(pos).seq
-                        seqto = self.alignment.getseq(seqnameto).subseqpos(pos).seq
-                    else:
-                        seqfrom = self.alignment.getseq(seqnamefrom).seq
-                        seqto = self.alignment.getseq(seqnameto).seq
+                    if (not probmin) or (
+                            (self.traitprob[nodefrom] > probmin) and
+                            (self.traitprob[nodeto] > probmin)):
+                        seqnamefrom = str(nodefrom)
+                        seqnameto = str(nodeto)
+                        traitfrom = self.trait[nodefrom]
+                        traitto = self.trait[nodeto]
+                        traitprobfrom = self.traitprob[nodefrom]
+                        traitprobto = self.traitprob[nodeto]
+                        if pos:
+                            seqfrom = self.alignment.getseq(seqnamefrom).subseqpos(pos).seq
+                            seqto = self.alignment.getseq(seqnameto).subseqpos(pos).seq
+                        else:
+                            seqfrom = self.alignment.getseq(seqnamefrom).seq
+                            seqto = self.alignment.getseq(seqnameto).seq
 
-                    # Could test for traitdiff before setting seq, but neater code this way...
-                    printbranch = True
-                    if printif_traitdiff and (traitfrom==traitto):
-                        printbranch = False
-                    if printif_seqdiff and (seqfrom==seqto):
-                        printbranch = False
-                    if printbranch:
-                        outfile.write("{}\t{}\t{}\t{}\t{}\t{}\n".format(
-                               nodefrom, nodeto, traitfrom, traitto, seqfrom, seqto))
+                        # Could test for traitdiff before setting seq, but neater code this way...
+                        printbranch = True
+                        if printif_traitdiff and (traitfrom==traitto):
+                            printbranch = False
+                        if printif_seqdiff and (seqfrom==seqto):
+                            printbranch = False
+                        if printbranch:
+                            outfile.write("{}\t{}\t{}\t{}\t{:.3f}\t{:.3f}\t{}\t{}\n".format(
+                                   nodefrom, nodeto, traitfrom, traitto,
+                                   traitprobfrom, traitprobto, seqfrom, seqto))
 
     ###############################################################################################
 
-    def branchdiff(self, outfilename, zeroindex=True, printif_traitdiff=False):
+    def branchdiff(self, outfilename, zeroindex=True, printif_traitdiff=False, probmin=None):
         """Writes results to 'outfilename':
         Output is one line of output for each sequence change, on all branches of the tree:
             node_from   node_to   site  trait_from   trait_to   residue_from   residue_to
         Here 'site' is the index of the sequence residue.
         Option zeroindex=False causes numbering to start at 1 (otherwise at 0)
         Option printif_traitdiff=True: only print branches where traits differ
+        Option probmin (if not None): Only print info where both nodes have traitprob > probmin
         """
 
         with open(outfilename, "w") as outfile:
-            outfile.write("# {}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(
-               "node_from", "node_to", "seqpos", "trait_from", "trait_to", "residue_from", "residue_to"))
+            outfile.write("# {}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(
+               "node_from", "node_to", "seqpos", "trait_from", "trait_to",
+               "traitprob_from", "traitprob_to", "residue_from", "residue_to"))
             for nodefrom in self.sortedintnodes:
                 for nodeto in self.tree.children(nodefrom):
-                    seqnamefrom = str(nodefrom)
-                    seqnameto = str(nodeto)
-                    traitfrom = self.trait[nodefrom]
-                    traitto = self.trait[nodeto]
-                    seqfrom = self.alignment.getseq(seqnamefrom)
-                    seqto = self.alignment.getseq(seqnameto)
-                    difflist = seqfrom.seqdiff(seqto, zeroindex)
+                    if (not probmin) or (
+                            (self.traitprob[nodefrom] > probmin) and
+                            (self.traitprob[nodeto] > probmin)):
+                        seqnamefrom = str(nodefrom)
+                        seqnameto = str(nodeto)
+                        traitfrom = self.trait[nodefrom]
+                        traitto = self.trait[nodeto]
+                        traitprobfrom = self.traitprob[nodefrom]
+                        traitprobto = self.traitprob[nodeto]
+                        seqfrom = self.alignment.getseq(seqnamefrom)
+                        seqto = self.alignment.getseq(seqnameto)
+                        difflist = seqfrom.seqdiff(seqto, zeroindex)
 
-                    # Could test for traitdiff before setting seq, but neater code this way...
-                    if (not printif_traitdiff) or (traitfrom!=traitto):
-                        for site,resfrom,resto in difflist:
-                            outfile.write("{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(
-                               nodefrom, nodeto, site, traitfrom, traitto, resfrom, resto))
+                        # Could test for traitdiff before setting seq, but neater code this way...
+                        if (not printif_traitdiff) or (traitfrom!=traitto):
+                            for site,resfrom,resto in difflist:
+                                outfile.write("{}\t{}\t{}\t{}\t{}\t{:.3f}\t{:.3f}\t{}\t{}\n".format(
+                                   nodefrom, nodeto, site, traitfrom, traitto,
+                                   traitprobfrom, traitprobto, resfrom, resto))
 
     ###############################################################################################
 
