@@ -72,13 +72,13 @@ class Anc_recon():
         ba_file = _Baseml_rstfile(baseml_rstfile)
         obj.tree = ba_file.get_tree()
         obj.alignment, obj.seqprob = ba_file.get_alignment()
+        obj.sortedintnodes = sorted(list(obj.tree.intnodes))
+        obj.sortednodes = sorted(list(obj.tree.leaves))
+        obj.sortednodes.extend(obj.sortedintnodes)
 
         mb_file = _MBASR_file(mbasr_treefile, mbasr_intnodefile, mbasr_leafstatefile, state0, state1)
         mb_tree = mb_file.get_tree()
         mb_trait, mb_probs = mb_file.get_trait_dict()
-        obj.sortedintnodes = sorted(list(obj.tree.intnodes))
-        obj.sortednodes = sorted(list(obj.tree.leaves))
-        obj.sortednodes.extend(obj.sortedintnodes)
 
         mbnode2banode, unmatch_baseml, unmatch_mbasr = mb_tree.match_nodes(obj.tree)
         if (unmatch_baseml != None) or (unmatch_mbasr != None):
@@ -91,8 +91,8 @@ class Anc_recon():
     ###############################################################################################
 
     @classmethod
-    def from_timetree(cls, ancseqfile, seqtreefile, statetreefile, stateprobfile):
-        """Parse information from timetree ancestral reconstruction of sequences and state
+    def from_treetime(cls, ancseqfile, seqtreefile, statetreefile, stateprobfile):
+        """Parse information from treetime ancestral reconstruction of sequences and state
 
         The following attributes are added:
             tree
@@ -104,7 +104,7 @@ class Anc_recon():
 
         obj = cls()
         obj.__init__()
-        tt = _TimeTreeResults(ancseqfile, seqtreefile, statetreefile, stateprobfile)
+        tt = _TreeTimeResults(ancseqfile, seqtreefile, statetreefile, stateprobfile)
         obj.tree = tt.seqtree
         obj.alignment = tt.alignment
         obj.trait = tt.trait
@@ -522,7 +522,7 @@ class _MBASR_file():
 ###################################################################################################
 ###################################################################################################
 
-class _TimeTreeResults:
+class _TreeTimeResults:
 
     def __init__(self, ancseqfile, seqtreefile, statetreefile, stateprobfile):
         self.seqtree, self.seqname2id = self._parsetreefile(seqtreefile)
