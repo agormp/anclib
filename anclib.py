@@ -29,7 +29,7 @@ class Anc_recon():
     Some sequences correspond to leaves on the tree. These are observed sequences.
     Other sequences correspond to internal nodes on the tree. These are ancestral reconstructions.
 
-    There is also information about credibility of sequence states: 100% for leaves, possibly
+    There is also information about credibility of sequence traits: 100% for leaves, possibly
     less for internal nodes. If there is no information about credibility, then these are
     set to 100%.
 
@@ -44,7 +44,7 @@ class Anc_recon():
         self.tree = None
         self.alignment = None
         self.seqprob = None
-        self.trait = {}
+        self.traitdict = {}
         self.traitprob = {}
         self.sortedintnodes = None
         self.sortednodes = None
@@ -70,28 +70,26 @@ class Anc_recon():
         obj = cls()
         obj.__init__()
         ba_file = _Baseml_rstfile(baseml_rstfile)
-        obj.tree = ba_file.get_tree()
-        obj.alignment, obj.seqprob = ba_file.get_alignment()
+        obj.tree = ba_file.tree
+        obj.alignment = ba_file.alignment
+        obj.seqprob = ba_file.seqprob
         obj.sortedintnodes = sorted(list(obj.tree.intnodes))
         obj.sortednodes = sorted(list(obj.tree.leaves))
         obj.sortednodes.extend(obj.sortedintnodes)
 
         mb_file = _MBASR_file(mbasr_treefile, mbasr_intnodefile, mbasr_leafstatefile, state0, state1)
         mb_tree = mb_file.get_tree()
-        mb_trait, mb_probs = mb_file.get_trait_dict()
+        mb_traitdict, mb_probs = mb_file.get_trait_dict()
 
-        mbnode2banode, unmatch_baseml, unmatch_mbasr = mb_tree.match_nodes(obj.tree)
-        if (unmatch_baseml != None) or (unmatch_mbasr != None):
-            raise AncError("BASEML and MBASR trees are rooted differently. Cannot merge info")
-        for mbnode,banode in mbnode2banode.items():
-            obj.trait[banode] = mb_trait[mbnode]
-            obj.traitprob[banode] = mb_probs[mbnode]
+        obj.traitdict, obj.traitprob = _match_traitid_seqid(obj.tree, mb_tree,
+                                                            mb_traitdict, mb_probs)
+
         return obj
 
     ###############################################################################################
 
     @classmethod
-    def from_treetime(cls, ancseqfile, seqtreefile, statetreefile, stateprobfile):
+    def from_treetime _treetime(cls, ancseqfile, seqtreefile, trait_treefile, trait_probfile):
         """Parse information from treetime ancestral reconstruction of sequences and state
 
         The following attributes are added:
@@ -104,15 +102,70 @@ class Anc_recon():
 
         obj = cls()
         obj.__init__()
-        tt = _TreeTimeResults(ancseqfile, seqtreefile, statetreefile, stateprobfile)
-        obj.tree = tt.seqtree
-        obj.alignment = tt.alignment
-        obj.trait = tt.trait
-        obj.traitprob = tt.traitprob
+        tt_seq_obj = _TreeTimeSeq(ancseqfile, seqtreefile)
+        obj.tree = tt_seq_obj.seqtree
+        obj.alignment = tt_seq_obj.alignment
         obj.sortedintnodes = sorted(list(obj.tree.intnodes))
         obj.sortednodes = sorted(list(obj.tree.leaves))
         obj.sortednodes.extend(obj.sortedintnodes)
+
+        tt_trait_obj = _TreeTimeTrait(trait_treefile, trait_probfile)
+        tt_tree = tt_trait_obj.trait_tree
+        tt_traitdict = tt_trait_obj.traitdict
+        tt_traitprob = tt_trait_obj.traitprob
+
+        obj.traitdict, obj.traitprob = obj._match_traitid_seqid(obj.tree, tt_tree,
+                                                            tt_traitdict, tt_traitprob)
         return obj
+
+    ###############################################################################################
+
+    @classmethod
+    def from_treetime_mbasr(cls, ancseqfile, seqtreefile,
+                            mbasr_treefile, mbasr_intnodefile, mbasr_leafstatefile,
+                            state0="state_0", state1="state_1"):
+        """Parse information from treetime ancestral reconstruction of sequences and state
+
+        The following attributes are added:
+            tree
+            alignment of sequences, including ancestral reconstructions. Seqname = str(nodeid)
+            trait state (dict of nodeid:state)
+
+        While keeping track of the internal node IDs used in the two trees (probably identical...)
+        """
+
+        obj = cls()
+        obj.__init__()
+        tt_seq_obj = _TreeTimeSeq(ancseqfile, seqtreefile)
+        obj.tree = tt_seq_obj.seqtree
+        obj.alignment = tt_seq_obj.alignment
+        obj.sortedintnodes = sorted(list(obj.tree.intnodes))
+        obj.sortednodes = sorted(list(obj.tree.leaves))
+        obj.sortednodes.extend(obj.sortedintnodes)
+
+        tt_trait_obj = _TreeTimeTrait(trait_treefile, trait_probfile)
+        tt_tree = tt_trait_obj.trait_tree
+        tt_traitdict = tt_trait_obj.traitdict
+        tt_traitprob = tt_trait_obj.traitprob
+
+        mb_file = _MBASR_file(mbasr_treefile, mbasr_intnodefile, mbasr_leafstatefile, state0, state1)
+
+        obj.traitdict, obj.traitprob = obj._match_traitid_seqid(obj.tree, mb_file.tree,
+                                                            mb_file.traitdict, mb_file.traitprob)
+        return obj
+
+    ###########################################################################################
+
+    def _match_traitid_seqid(self, seqtree, trait_tree, traitdict, traitprob):
+        trateid2seqid,unmatch1,unmatch2 = trait_tree.match_nodes(seqtree)
+        if (unmatch1 != None) or (unmatch2 != None):
+            raise AncError("Seq-tree and trait-tree are rooted differently. Cannot merge info")
+        new_traitdict = {}
+        new_traitprob = {}
+        for trateid,seqid in trateid2seqid.items():
+            new_traitdict[seqid] = traitdict[trateid]
+            new_traitprob[seqid] = traitprob[trateid]
+        return new_traitdict, new_traitprob
 
     ###############################################################################################
 
@@ -141,7 +194,7 @@ class Anc_recon():
             for nodeid in self.sortednodes:
                 if (not probmin) or (self.traitprob[nodeid] > probmin):
                     seqname = str(nodeid)
-                    trait = self.trait[nodeid]
+                    trait = self.traitdict[nodeid]
                     traitprob = self.traitprob[nodeid]
                     if pos:
                         seq = self.alignment.getseq(seqname).subseqpos(pos).seq
@@ -186,8 +239,8 @@ class Anc_recon():
                             (self.traitprob[nodeto] > probmin)):
                         seqnamefrom = str(nodefrom)
                         seqnameto = str(nodeto)
-                        traitfrom = self.trait[nodefrom]
-                        traitto = self.trait[nodeto]
+                        traitfrom = self.traitdict[nodefrom]
+                        traitto = self.traitdict[nodeto]
                         traitprobfrom = self.traitprob[nodefrom]
                         traitprobto = self.traitprob[nodeto]
                         if pos:
@@ -231,8 +284,8 @@ class Anc_recon():
                             (self.traitprob[nodeto] > probmin)):
                         seqnamefrom = str(nodefrom)
                         seqnameto = str(nodeto)
-                        traitfrom = self.trait[nodefrom]
-                        traitto = self.trait[nodeto]
+                        traitfrom = self.traitdict[nodefrom]
+                        traitto = self.traitdict[nodeto]
                         traitprobfrom = self.traitprob[nodefrom]
                         traitprobto = self.traitprob[nodeto]
                         seqfrom = self.alignment.getseq(seqnamefrom)
@@ -303,6 +356,8 @@ class _Baseml_rstfile():
         # Note: nodenums start at 1, not 0 (this is BASEML node-numbering scheme)
         self.nodeid2nodenum, self.nodenum2nodeid = self._map_nodeid_nodenum()
         self.nodeids = set(self.nodeid2nodenum.keys())
+        self.tree = self.get_tree()
+        self.alignment, self.seqprob = self.get_alignment_info()
 
     ###########################################################################################
 
@@ -346,7 +401,7 @@ class _Baseml_rstfile():
 
     ###########################################################################################
 
-    def get_alignment(self):
+    def get_alignment_info(self):
         """Extracts sequence information corresponding to extant and ancestral sequences.
         Returns sequencelib.Seq_alignment object and 2D numpy array with residue probs"""
 
@@ -470,6 +525,8 @@ class _MBASR_file():
         self.nleaf = self.leafnodestate.shape[0]
         self.state0 = state0
         self.state1 = state1
+        self.tree = self.get_tree()
+        self.traitdict, self.traitprob = self.get_trait_dict()
 
     ###########################################################################################
 
@@ -494,12 +551,12 @@ class _MBASR_file():
     ###########################################################################################
 
     def get_trait_dict(self):
-        statenamedict = {0:self.state0, 1:self.state1}
+        traitnamedict = {0:self.state0, 1:self.state1}
         nodeidlist = list(self.leafnodestate["leafID"])
         intnodeidlist = [int(x.replace("node","")) for x in self.intnodestate["nodeID"]]
         nodeidlist.extend(intnodeidlist)
 
-        traitstatelist = [statenamedict[state] for state in self.leafnodestate["state"]]
+        traitstatelist = [traitnamedict[trait] for trait in self.leafnodestate["state"]]
         traitproblist = [1.0] * self.nleaf
         intnodestatelist = []
         intproblist = []
@@ -522,18 +579,7 @@ class _MBASR_file():
 ###################################################################################################
 ###################################################################################################
 
-class _TreeTimeResults:
-
-    def __init__(self, ancseqfile, seqtreefile, statetreefile, stateprobfile):
-        self.seqtree, self.seqname2id = self._parsetreefile(seqtreefile)
-        self.statetree, self.statename2id = self._parsetreefile(statetreefile)
-        self.alignment = self._parsealignfile(ancseqfile, self.seqtree, self.seqname2id)
-        self.check_input()
-        statename2seqid = self._match_state_seq(self.statetree, self.seqtree, self.statename2id)
-        self.trait, self.traitprob = self._parsetraits(statetreefile, stateprobfile,
-                                                        statename2seqid, self.seqtree)
-
-    ###########################################################################################
+class _TreeTime:
 
     def _parsetreefile(self, treefile):
         with pt.Nexustreefile(treefile) as tf:
@@ -558,6 +604,15 @@ class _TreeTimeResults:
         name2id[rootname] = tree.root
         return name2id
 
+###################################################################################################
+###################################################################################################
+
+class _TreeTimeSeq(_TreeTime):
+
+    def __init__(self, ancseqfile, seqtreefile):
+        self.seqtree, self.seqname2id = self._parsetreefile(seqtreefile)
+        self.alignment = self._parsealignfile(ancseqfile, self.seqtree, self.seqname2id)
+
     ###########################################################################################
 
     def _parsealignfile(self, alignfile, tree, name2id):
@@ -569,28 +624,28 @@ class _TreeTimeResults:
             alignment.changeseqname(origname, newname)
         return alignment
 
-    ###########################################################################################
+###################################################################################################
+###################################################################################################
 
-    def _match_state_seq(self, statetree, seqtree, statename2id):
-        stateid2seqid,_,_ = statetree.match_nodes(seqtree)
-        statename2seqid = {}
-        for statename, stateid in statename2id.items():
-            seqid = stateid2seqid[stateid]
-            statename2seqid[statename] = seqid
-        return statename2seqid
+class _TreeTimeTrait(_TreeTime):
 
-    ###########################################################################################
-
-    def _parsetraits(self, statetreefile, stateprobfile, statename2seqid, seqtree):
-        trait = self._parse_annot_tree(statetreefile, statename2seqid) # This dict has no root entry
-        traitprob, seqid2AB = self._parse_CSV(stateprobfile, statename2seqid)
-        trait = self._match_AB_trait(seqid2AB, trait, seqtree)   # Add root trait. Check consistency
-        return trait, traitprob
+    def __init__(self, trait_treefile, trait_probfile):
+        self.trait_tree, self.traitname2id = self._parsetreefile(trait_treefile)
+        self.traitdict, self.traitprob = self._parsetraits(trait_treefile, trait_probfile,
+                                                        self.trait_tree, self.traitname2id)
 
     ###########################################################################################
 
-    def _parse_annot_tree(self, statetreefile, statename2seqid):
-        with open(statetreefile, "r") as infile:
+    def _parsetraits(self, trait_treefile, trait_probfile, trait_tree, traitname2id):
+        traitdict = self._parse_annot_tree(trait_treefile, traitname2id) # This dict has no root entry
+        traitprob, traitid2AB = self._parse_CSV(trait_probfile, traitname2id)
+        traitdict = self._match_AB_trait(traitid2AB, traitdict, trait_tree)   # Add root trait. Check consistency
+        return traitdict, traitprob
+
+    ###########################################################################################
+
+    def _parse_annot_tree(self, trait_treefile, traitname2id):
+        with open(trait_treefile, "r") as infile:
             while True:
                 line = infile.readline()
                 if line.startswith("Begin Trees"):
@@ -604,41 +659,42 @@ class _TreeTimeResults:
                     treestring += line
         treestring = treestring.replace("\n", "")
         nodenames = re.findall(r"[\(\),]([^\(\),:]+):", treestring)
-        nodenames = nodenames[:-1]    # One too long: no state for root node for some reason
-        states = re.findall(r'\[&[\w]+=\"(\w+)\"\]', treestring)
+        nodenames = nodenames[:-1]    # One too long: no trait for root node for some reason
+        traits = re.findall(r'\[&[\w]+=\"(\w+)\"\]', treestring)
+
         traitdict = {}
-        for name,state in zip(nodenames, states):
-            seqid = statename2seqid[name]
-            traitdict[seqid] = state
+        for traitname, trait in zip(nodenames, traits):
+            traitid = traitname2id[traitname]
+            traitdict[traitid] = trait
         return traitdict
 
     ###########################################################################################
 
-    def _parse_CSV(self, stateprobfile, statename2seqid):
+    def _parse_CSV(self, trait_probfile, traitname2id):
         traitprob = {}
-        seqid2AB = {}
-        with open(stateprobfile) as csvfile:
+        traitid2AB = {}
+        with open(trait_probfile) as csvfile:
             reader = csv.reader(csvfile)
             next(reader)
             for row in reader:
-                seqid = statename2seqid[row[0]]
+                traitid = traitname2id[row[0]]
                 pA, pB = float(row[1]), float(row[2])
                 if pA > pB:
-                    traitprob[seqid] = pA
-                    seqid2AB[seqid] = "A"
+                    traitprob[traitid] = pA
+                    traitid2AB[traitid] = "A"
                 else:
-                    traitprob[seqid] = pB
-                    seqid2AB[seqid] = "B"
-        return traitprob, seqid2AB
+                    traitprob[traitid] = pB
+                    traitid2AB[traitid] = "B"
+        return traitprob, traitid2AB
 
     ###########################################################################################
 
-    def _match_AB_trait(self, seqid2AB, trait, seqtree):
+    def _match_AB_trait(self, traitid2AB, traitdict, trait_tree):
         # Python note: hardwired to two possible trait values. Think about generalizing
-        random_leaf = seqtree.leaflist()[0]
-        ABval = seqid2AB[random_leaf]
-        traitval = trait[random_leaf]
-        possible_traitvals = set(trait.values())
+        random_leaf = trait_tree.leaflist()[0]
+        ABval = traitid2AB[random_leaf]
+        traitval = traitdict[random_leaf]
+        possible_traitvals = set(traitdict.values())
         other_trait = (possible_traitvals - {traitval}).pop()
         AB2trait = {}
         if ABval == "A":
@@ -647,38 +703,22 @@ class _TreeTimeResults:
         else:
             AB2trait["A"] = other_trait
             AB2trait["B"] = traitval
-        root_ABtrait = seqid2AB[seqtree.root]
+        root_ABtrait = traitid2AB[trait_tree.root]
         root_trait = AB2trait[root_ABtrait]
-        trait[seqtree.root] = root_trait
-        self._check_trait_consistency(AB2trait, seqid2AB, trait)
-        return trait
+        traitdict[trait_tree.root] = root_trait
+        self._check_trait_consistency(AB2trait, traitid2AB, traitdict)
+        return traitdict
 
     ###########################################################################################
 
-    def _check_trait_consistency(self, AB2trait, seqid2AB, traitdict):
-        for seqid,trait in traitdict.items():
-            ABval = seqid2AB[seqid]
+    def _check_trait_consistency(self, AB2trait, traitid2AB, traitdict):
+        for traitid,traitval in traitdict.items():
+            ABval = traitid2AB[traitid]
             expected_trait = AB2trait[ABval]
-            if expected_trait != traitdict[seqid]:
-                raise AncError(f"Inconsistency between confidence.csv and annotated tree for node {seqid}:\n"
+            if expected_trait != traitdict[traitid]:
+                raise AncError(f"Inconsistency between confidence.csv and annotated tree for node {traitid}:\n"
                                f"Trait in CSV file:       {expected_trait}\n"
-                               f"Trait in annotated tree: {trait[seqid]}")
-
-    ###########################################################################################
-
-    def check_input(self):
-        if len(self.seqtree.nodes) != len(self.statetree.nodes):
-            raise AncError("State-tree and seq-tree do not have same number of nodes. Can't merge")
-        if self.seqtree.topology() != self.statetree.topology():
-            raise AncError("State-tree and seq-tree do not have same topology. Can't merge")
-        if len(self.alignment) != len(self.seqtree.nodes):
-            raise AncError(f"Wrong number of sequences:"
-                            " {len(self.alignment)} seqs in FASTA file, but"
-                            " {len(self.seqtree)} nodes in seqtree")
-
-
-
-
+                               f"Trait in annotated tree: {traitdict[traitid]}")
 
 
 
