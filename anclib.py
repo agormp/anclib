@@ -69,7 +69,8 @@ class AncRecon:
 
     ###############################################################################################
 
-    def nodeinfo(self, outfilename, varseq=False, poslist=None, zeroindex=True, probmin=None):
+    def nodeinfo(self, outfilename, varseq=False, poslist=None, zeroindex=True, probmin=None,
+                 translate=False):
         """Writes results to 'outfilename':
         Output is one line per node in tree - with following informations:
             nodeid  traitstate  traitprob seqstates
@@ -83,8 +84,12 @@ class AncRecon:
             pos = None
             if varseq and poslist:
                 raise AncError("Specify either varseq or poslist option - not both")
+            if translate:
+                alignment = self.alignment.translate()
+            else:
+                alignment = self.alignment
             if varseq:
-                pos = self.alignment.varcols()
+                pos = alignment.varcols()
             elif poslist:
                 pos = poslist
 
@@ -97,15 +102,16 @@ class AncRecon:
                     trait = self.traitdict[nodeid]
                     traitprob = self.traitprob[nodeid]
                     if pos:
-                        seq = self.alignment.getseq(seqname).subseqpos(pos).seq
+                        seq = alignment.getseq(seqname).subseqpos(pos).seq
                     else:
-                        seq = self.alignment.getseq(seqname).seq
+                        seq = alignment.getseq(seqname).seq
                     outfile.write(f"{nodeid}\t{trait}\t{traitprob:.3f}\t{seq}\n")
 
     ###############################################################################################
 
     def branchinfo(self, outfilename, varseq=False, poslist=None, zeroindex=True,
-                    printif_traitdiff=False, printif_seqdiff=False, probmin=None):
+                    printif_traitdiff=False, printif_seqdiff=False, probmin=None,
+                    translate=False):
         """Writes results to 'outfilename':
         Outputs one line per branch with following informations:
           nodeid_from  nodeid_to  trait_from  trait_to  traitprob_from  traitprob_to seq_from  seq_to
@@ -124,8 +130,12 @@ class AncRecon:
             pos = None
             if varseq and poslist:
                 raise AncError("Specify either varseq or poslist option - not both")
+            if translate:
+                alignment = self.alignment.translate()
+            else:
+                alignment = self.alignment
             if varseq:
-                pos = self.alignment.varcols()
+                pos = alignment.varcols()
             elif poslist:
                 pos = poslist
 
@@ -144,11 +154,11 @@ class AncRecon:
                         traitprobfrom = self.traitprob[nodefrom]
                         traitprobto = self.traitprob[nodeto]
                         if pos:
-                            seqfrom = self.alignment.getseq(seqnamefrom).subseqpos(pos).seq
-                            seqto = self.alignment.getseq(seqnameto).subseqpos(pos).seq
+                            seqfrom = alignment.getseq(seqnamefrom).subseqpos(pos).seq
+                            seqto = alignment.getseq(seqnameto).subseqpos(pos).seq
                         else:
-                            seqfrom = self.alignment.getseq(seqnamefrom).seq
-                            seqto = self.alignment.getseq(seqnameto).seq
+                            seqfrom = alignment.getseq(seqnamefrom).seq
+                            seqto = alignment.getseq(seqnameto).seq
 
                         # Could test for traitdiff before setting seq, but neater code this way...
                         printbranch = True
@@ -163,7 +173,8 @@ class AncRecon:
 
     ###############################################################################################
 
-    def branchdiff(self, outfilename, zeroindex=True, printif_traitdiff=False, probmin=None):
+    def branchdiff(self, outfilename, zeroindex=True, printif_traitdiff=False, probmin=None,
+                   translate=False):
         """Writes results to 'outfilename':
         Output is one line of output for each sequence change, on all branches of the tree:
             node_from, node_to, site, trait_from, trait_to,
@@ -178,6 +189,10 @@ class AncRecon:
             outfile.write("# {}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(
                "node_from", "node_to", "seqpos", "trait_from", "trait_to",
                "traitprob_from", "traitprob_to", "residue_from", "residue_to"))
+            if translate:
+                alignment = self.alignment.translate()
+            else:
+                alignment = self.alignment
             for nodefrom in self.sortedintnodes:
                 for nodeto in self.tree.children(nodefrom):
                     if (not probmin) or (
@@ -189,8 +204,8 @@ class AncRecon:
                         traitto = self.traitdict[nodeto]
                         traitprobfrom = self.traitprob[nodefrom]
                         traitprobto = self.traitprob[nodeto]
-                        seqfrom = self.alignment.getseq(seqnamefrom)
-                        seqto = self.alignment.getseq(seqnameto)
+                        seqfrom = alignment.getseq(seqnamefrom)
+                        seqto = alignment.getseq(seqnameto)
                         difflist = seqfrom.seqdiff(seqto, zeroindex)
 
                         # Could test for traitdiff before setting seq, but neater code this way...
