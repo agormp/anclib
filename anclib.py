@@ -8,6 +8,8 @@ import phylotreelib as pt
 
 import numpy as np
 import pandas as pd
+
+# Python note: I could make these imports conditional (placing them in MBASR section)
 import rpy2
 import rpy2.robjects as robjects
 from rpy2.robjects.packages import importr
@@ -411,7 +413,6 @@ class MBASRTrait:
 
         # Read treefile, store branch info as pandas dataframe
         # Note: I am cargo culting the rpy2 code here...
-        # Format:
         ape = importr("ape")
         tidytree = importr("tidytree")
         tree = ape.read_tree(treefile)
