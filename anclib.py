@@ -166,7 +166,8 @@ class AncRecon:
     def branchdiff(self, outfilename, zeroindex=True, printif_traitdiff=False, probmin=None):
         """Writes results to 'outfilename':
         Output is one line of output for each sequence change, on all branches of the tree:
-            node_from   node_to   site  trait_from   trait_to   residue_from   residue_to
+            node_from, node_to, site, trait_from, trait_to,
+                                      traitprob_from, traitprob_to, residue_from, residue_to
         Here 'site' is the index of the sequence residue.
         Option zeroindex=False causes numbering to start at 1 (otherwise at 0)
         Option printif_traitdiff=True: only print branches where traits differ
