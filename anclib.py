@@ -235,11 +235,11 @@ class BasemlSeq:
 
     ###############################################################################################
 
-    def __init__(self,rst_filename=None):
+    def __init__(self, rstfile):
         """Check file contains needed info about tree and sequences.
         Construct dictionaries mapping between nodeID, seqname, and index"""
 
-        self.rstfile = open(filename, mode="rt", encoding="UTF-8")
+        self.rstfile = open(rstfile, mode="rt", encoding="UTF-8")
 
         self._read_until("^Ancestral reconstruction by BASEML")
         self.rstfile.readline()
@@ -516,8 +516,8 @@ class _TreeTime:
 
 class TreeTimeSeq(_TreeTime):
 
-    def __init__(self, ancseqfile, seqtreefile):
-        self.tree, self.seqname2id = self._parsetreefile(seqtreefile)
+    def __init__(self, ancseqfile, seq_treefile):
+        self.tree, self.seqname2id = self._parsetreefile(seq_treefile)
         self.alignment = self._parsealignfile(ancseqfile, self.tree, self.seqname2id)
 
     ###########################################################################################
