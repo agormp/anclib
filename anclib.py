@@ -23,22 +23,17 @@ class AncError(Exception):
 ###################################################################################################
 ###################################################################################################
 
-class AncRecon():
-    """Created from one AncSeq object, and one AncTrait object.
+class AncRecon:
+    """Created from one ancseq object, and one anctrait object.
     Contains info about tree, and also about sequences and traits (ancestral and reconstructed)
 
-    Some sequences correspond to leaves on the tree. These are observed sequences.
-    Other sequences correspond to internal nodes on the tree. These are ancestral reconstructions.
+    Some seqs/trait correspond to leaves on the tree. These are observed seqs/trait.
+    Other seqs/trait correspond to internal nodes. These are ancestral reconstructions.
 
-    There is also information about credibility of sequence traits: 100% for leaves, possibly
-    less for internal nodes. If there is no information about credibility, then these are
-    set to 100%.
+    There may also be information about credibility of reconstructed seqs/traits
+    (100% for leaves, possibly less for internal nodes)
 
-    Objects may also contain information about other, non-sequence, traits. These also have
-    associated credibilities.
-
-    There are several constructors corresponding to different sources of information.
-    There are also methods for adding extra information to already constructed objects.
+    Object can output information about nodes, branches, changes, etc.
     """
 
     def __init__(self, ancseq, anctrait):
