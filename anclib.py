@@ -23,8 +23,9 @@ class AncError(Exception):
 ###################################################################################################
 ###################################################################################################
 
-class Anc_recon():
-    """Objects of this class contain a tree and a corresponding set of sequences.
+class AncRecon():
+    """Created from one AncSeq object, and one AncTrait object.
+    Contains info about tree, and also about sequences and traits (ancestral and reconstructed)
 
     Some sequences correspond to leaves on the tree. These are observed sequences.
     Other sequences correspond to internal nodes on the tree. These are ancestral reconstructions.
@@ -40,14 +41,23 @@ class Anc_recon():
     There are also methods for adding extra information to already constructed objects.
     """
 
-    def __init__(self):
-        self.tree = None
-        self.alignment = None
-        self.seqprob = None
-        self.traitdict = {}
-        self.traitprob = {}
-        self.sortedintnodes = None
-        self.sortednodes = None
+    def __init__(self, ancseq, anctrait):
+        self.tree = ancseq.tree
+        self.alignment = ancseq.alignment
+        if hasattr(ancseq, seqprob):
+            self.seqprob = ancseq.seqprob
+        else:
+            self.seqprob = None # Python note: should I set to zeroes?
+        self.sortedintnodes = sorted(list(self.tree.intnodes))
+        self.sortednodes = sorted(list(self.tree.leaves))
+        self.sortednodes.extend(self.sortedintnodes)
+
+        trait_tree = anctrait.tree
+        orig_traitdict = anctrait.traitdict
+        orig_traitprob = anctrait.traitprob    # Python note: Always there?
+
+        self.traitdict, self.traitprob = _match_traitid_seqid(self.tree, trait_tree,
+                                                            orig_traitdict, orig_traitprob)
 
     ###############################################################################################
 
@@ -312,7 +322,7 @@ class Anc_recon():
 ###################################################################################################
 ###################################################################################################
 
-class _Baseml_rstfile():
+class BasemlSeq:
     """Class representing parser for BASEML rst file.
 
     Methods for extracing tree, alignment, and residue probabilities for ancestral
@@ -327,7 +337,7 @@ class _Baseml_rstfile():
 
     ###############################################################################################
 
-    def __init__(self, filename=None):
+    def __init__(self,rst_filename=None):
         """Check file contains needed info about tree and sequences.
         Construct dictionaries mapping between nodeID, seqname, and index"""
 
@@ -481,7 +491,7 @@ class _Baseml_rstfile():
 ###################################################################################################
 ###################################################################################################
 
-class _MBASR_file():
+class MBASRTrait:
     """Class representing parser for MBASR ancestral reconstruction file.
 
     Methods for extracing one tree and one alignment of ancestral (and contemporaneous) sequences.
@@ -607,10 +617,10 @@ class _TreeTime:
 ###################################################################################################
 ###################################################################################################
 
-class _TreeTimeSeq(_TreeTime):
+class TreeTimeSeq(_TreeTime):
 
     def __init__(self, ancseqfile, seqtreefile):
-        self.seqtree, self.seqname2id = self._parsetreefile(seqtreefile)
+        self.tree, self.seqname2id = self._parsetreefile(seqtreefile)
         self.alignment = self._parsealignfile(ancseqfile, self.seqtree, self.seqname2id)
 
     ###########################################################################################
@@ -627,10 +637,10 @@ class _TreeTimeSeq(_TreeTime):
 ###################################################################################################
 ###################################################################################################
 
-class _TreeTimeTrait(_TreeTime):
+class TreeTimeTrait(_TreeTime):
 
     def __init__(self, trait_treefile, trait_probfile):
-        self.trait_tree, self.traitname2id = self._parsetreefile(trait_treefile)
+        self.tree, self.traitname2id = self._parsetreefile(trait_treefile)
         self.traitdict, self.traitprob = self._parsetraits(trait_treefile, trait_probfile,
                                                         self.trait_tree, self.traitname2id)
 
