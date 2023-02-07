@@ -44,7 +44,7 @@ class AncRecon():
     def __init__(self, ancseq, anctrait):
         self.tree = ancseq.tree
         self.alignment = ancseq.alignment
-        if hasattr(ancseq, seqprob):
+        if hasattr(ancseq, "seqprob"):
             self.seqprob = ancseq.seqprob
         else:
             self.seqprob = None # Python note: should I set to zeroes?
@@ -56,113 +56,8 @@ class AncRecon():
         orig_traitdict = anctrait.traitdict
         orig_traitprob = anctrait.traitprob    # Python note: Always there?
 
-        self.traitdict, self.traitprob = _match_traitid_seqid(self.tree, trait_tree,
+        self.traitdict, self.traitprob = self._match_traitid_seqid(self.tree, trait_tree,
                                                             orig_traitdict, orig_traitprob)
-
-    ###############################################################################################
-
-    @classmethod
-    def from_baseml_mbasr(cls, baseml_rstfile,
-                              mbasr_treefile, mbasr_intnodefile, mbasr_leafstatefile,
-                              state0="state_0", state1="state_1"):
-        """Combine information from BASEML rst file, and MBASR ancestral state reconstruction
-
-        The following attributes are added:
-            tree
-            alignment of sequences, including ancestral reconstructions. Seqname = str(nodeid)
-            probabilities for seq residues (dict of nodeid:numpy array)
-            trait state (dict of nodeid:state)
-            trait state probabillity (dict of nodeid:state probability)
-
-        The nodeids used by MBASR are changed to match those used by BASEML
-        """
-
-        obj = cls()
-        obj.__init__()
-        ba_file = _Baseml_rstfile(baseml_rstfile)
-        obj.tree = ba_file.tree
-        obj.alignment = ba_file.alignment
-        obj.seqprob = ba_file.seqprob
-        obj.sortedintnodes = sorted(list(obj.tree.intnodes))
-        obj.sortednodes = sorted(list(obj.tree.leaves))
-        obj.sortednodes.extend(obj.sortedintnodes)
-
-        mb_file = _MBASR_file(mbasr_treefile, mbasr_intnodefile, mbasr_leafstatefile, state0, state1)
-        mb_tree = mb_file.get_tree()
-        mb_traitdict, mb_probs = mb_file.get_trait_dict()
-
-        obj.traitdict, obj.traitprob = _match_traitid_seqid(obj.tree, mb_tree,
-                                                            mb_traitdict, mb_probs)
-
-        return obj
-
-    ###############################################################################################
-
-    @classmethod
-    def from_treetime _treetime(cls, ancseqfile, seqtreefile, trait_treefile, trait_probfile):
-        """Parse information from treetime ancestral reconstruction of sequences and state
-
-        The following attributes are added:
-            tree
-            alignment of sequences, including ancestral reconstructions. Seqname = str(nodeid)
-            trait state (dict of nodeid:state)
-
-        While keeping track of the internal node IDs used in the two trees (probably identical...)
-        """
-
-        obj = cls()
-        obj.__init__()
-        tt_seq_obj = _TreeTimeSeq(ancseqfile, seqtreefile)
-        obj.tree = tt_seq_obj.seqtree
-        obj.alignment = tt_seq_obj.alignment
-        obj.sortedintnodes = sorted(list(obj.tree.intnodes))
-        obj.sortednodes = sorted(list(obj.tree.leaves))
-        obj.sortednodes.extend(obj.sortedintnodes)
-
-        tt_trait_obj = _TreeTimeTrait(trait_treefile, trait_probfile)
-        tt_tree = tt_trait_obj.trait_tree
-        tt_traitdict = tt_trait_obj.traitdict
-        tt_traitprob = tt_trait_obj.traitprob
-
-        obj.traitdict, obj.traitprob = obj._match_traitid_seqid(obj.tree, tt_tree,
-                                                            tt_traitdict, tt_traitprob)
-        return obj
-
-    ###############################################################################################
-
-    @classmethod
-    def from_treetime_mbasr(cls, ancseqfile, seqtreefile,
-                            mbasr_treefile, mbasr_intnodefile, mbasr_leafstatefile,
-                            state0="state_0", state1="state_1"):
-        """Parse information from treetime ancestral reconstruction of sequences and state
-
-        The following attributes are added:
-            tree
-            alignment of sequences, including ancestral reconstructions. Seqname = str(nodeid)
-            trait state (dict of nodeid:state)
-
-        While keeping track of the internal node IDs used in the two trees (probably identical...)
-        """
-
-        obj = cls()
-        obj.__init__()
-        tt_seq_obj = _TreeTimeSeq(ancseqfile, seqtreefile)
-        obj.tree = tt_seq_obj.seqtree
-        obj.alignment = tt_seq_obj.alignment
-        obj.sortedintnodes = sorted(list(obj.tree.intnodes))
-        obj.sortednodes = sorted(list(obj.tree.leaves))
-        obj.sortednodes.extend(obj.sortedintnodes)
-
-        tt_trait_obj = _TreeTimeTrait(trait_treefile, trait_probfile)
-        tt_tree = tt_trait_obj.trait_tree
-        tt_traitdict = tt_trait_obj.traitdict
-        tt_traitprob = tt_trait_obj.traitprob
-
-        mb_file = _MBASR_file(mbasr_treefile, mbasr_intnodefile, mbasr_leafstatefile, state0, state1)
-
-        obj.traitdict, obj.traitprob = obj._match_traitid_seqid(obj.tree, mb_file.tree,
-                                                            mb_file.traitdict, mb_file.traitprob)
-        return obj
 
     ###########################################################################################
 
@@ -308,16 +203,6 @@ class AncRecon():
                                 outfile.write("{}\t{}\t{}\t{}\t{}\t{:.3f}\t{:.3f}\t{}\t{}\n".format(
                                    nodefrom, nodeto, site, traitfrom, traitto,
                                    traitprobfrom, traitprobto, resfrom, resto))
-
-    ###############################################################################################
-
-    def varpos(self, zeroindex=True):
-        """Returns list of variable (unconserved) sites in alignment of sequences"""
-
-        varpos = self.alignment.varcols()
-        if not zeroindex:
-            varpos = [pos+1 for pos in varpos]
-        return varpos
 
 ###################################################################################################
 ###################################################################################################
@@ -621,7 +506,7 @@ class TreeTimeSeq(_TreeTime):
 
     def __init__(self, ancseqfile, seqtreefile):
         self.tree, self.seqname2id = self._parsetreefile(seqtreefile)
-        self.alignment = self._parsealignfile(ancseqfile, self.seqtree, self.seqname2id)
+        self.alignment = self._parsealignfile(ancseqfile, self.tree, self.seqname2id)
 
     ###########################################################################################
 
@@ -642,7 +527,7 @@ class TreeTimeTrait(_TreeTime):
     def __init__(self, trait_treefile, trait_probfile):
         self.tree, self.traitname2id = self._parsetreefile(trait_treefile)
         self.traitdict, self.traitprob = self._parsetraits(trait_treefile, trait_probfile,
-                                                        self.trait_tree, self.traitname2id)
+                                                        self.tree, self.traitname2id)
 
     ###########################################################################################
 
