@@ -78,6 +78,7 @@ class AncRecon:
             nodeid  traitstate  traitprob seqstates
         option varseq=True outputs only variable sites from sequences.
         option probmin (if not None): Only print info for nodes with traitprob > probmin
+        option translate: Translate DNA to amino acid sequences. Note position info is now for aa
         Can also explicitly provide poslist of sites to be printed. Indexing in poslist
         can start at 0 (zeroindex=True) or 1 (zeroindex=False)"""
 
@@ -123,6 +124,7 @@ class AncRecon:
         Option printif_traitdiff=True: only print branches where traits differ
         Option printif_seqdiff=True: only print branches where selected residues have changed
         option probmin (if not None): Only print info where both nodes have traitprob > probmin
+        option translate: Translate DNA to amino acid sequences. Note position info is now for aa
         """
 
         with open(outfilename, "w") as outfile:
@@ -185,6 +187,7 @@ class AncRecon:
         Option zeroindex=False causes numbering to start at 1 (otherwise at 0)
         Option printif_traitdiff=True: only print branches where traits differ
         Option probmin (if not None): Only print info where both nodes have traitprob > probmin
+        Option translate: Translate DNA to amino acid sequences. Note position info is now for aa
         """
 
         with open(outfilename, "w") as outfile:
