@@ -117,7 +117,8 @@ class AncRecon:
                     translate=False):
         """Writes results to 'outfilename':
         Outputs one line per branch with following informations:
-          nodeid_from  nodeid_to  trait_from  trait_to  traitprob_from  traitprob_to seq_from  seq_to
+          nodeid_from  nodeid_to  branchlen trait_from  trait_to
+                                            traitprob_from  traitprob_to seq_from  seq_to
         Option varseq=True (default) output only variable sites from sequences.
         Option poslist: specify sites to be printed.
         Option zeroindex=True: Start indexing of poslist at 0 (otherwise start at 1)
@@ -128,8 +129,8 @@ class AncRecon:
         """
 
         with open(outfilename, "w") as outfile:
-            outfile.write("# {}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(
-                   "node_from", "node_to", "trait_from", "trait_to",
+            outfile.write("# {}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(
+                   "node_from", "node_to", "branch_len", "trait_from", "trait_to",
                    "traitprob_from", "traitprob_to", "seq_from", "seq_to"))
             pos = None
             if varseq and poslist:
@@ -153,6 +154,7 @@ class AncRecon:
                             (self.traitprob[nodeto] > probmin)):
                         seqnamefrom = str(nodefrom)
                         seqnameto = str(nodeto)
+                        blen = self.tree.nodedist(nodefrom, nodeto)
                         traitfrom = self.traitdict[nodefrom]
                         traitto = self.traitdict[nodeto]
                         traitprobfrom = self.traitprob[nodefrom]
@@ -171,8 +173,8 @@ class AncRecon:
                         if printif_seqdiff and (seqfrom==seqto):
                             printbranch = False
                         if printbranch:
-                            outfile.write("{}\t{}\t{}\t{}\t{:.3f}\t{:.3f}\t{}\t{}\n".format(
-                                   nodefrom, nodeto, traitfrom, traitto,
+                            outfile.write("{}\t{}\t{}\t{}\t{}\t{:.3f}\t{:.3f}\t{}\t{}\n".format(
+                                   nodefrom, nodeto, blen, traitfrom, traitto,
                                    traitprobfrom, traitprobto, seqfrom, seqto))
 
     ###############################################################################################
@@ -181,7 +183,7 @@ class AncRecon:
                    translate=False):
         """Writes results to 'outfilename':
         Output is one line of output for each sequence change, on all branches of the tree:
-            node_from, node_to, site, trait_from, trait_to,
+            node_from, node_to, branch_len, site, trait_from, trait_to,
                                       traitprob_from, traitprob_to, residue_from, residue_to
         Here 'site' is the index of the sequence residue.
         Option zeroindex=False causes numbering to start at 1 (otherwise at 0)
@@ -191,8 +193,8 @@ class AncRecon:
         """
 
         with open(outfilename, "w") as outfile:
-            outfile.write("# {}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(
-               "node_from", "node_to", "seqpos", "trait_from", "trait_to",
+            outfile.write("# {}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(
+               "node_from", "node_to", "branch_len", "seqpos", "trait_from", "trait_to",
                "traitprob_from", "traitprob_to", "residue_from", "residue_to"))
             if translate:
                 alignment = self.alignment.translate()
@@ -205,6 +207,7 @@ class AncRecon:
                             (self.traitprob[nodeto] > probmin)):
                         seqnamefrom = str(nodefrom)
                         seqnameto = str(nodeto)
+                        blen = self.tree.nodedist(nodefrom, nodeto)
                         traitfrom = self.traitdict[nodefrom]
                         traitto = self.traitdict[nodeto]
                         traitprobfrom = self.traitprob[nodefrom]
@@ -216,8 +219,8 @@ class AncRecon:
                         # Could test for traitdiff before setting seq, but neater code this way...
                         if (not printif_traitdiff) or (traitfrom!=traitto):
                             for site,resfrom,resto in difflist:
-                                outfile.write("{}\t{}\t{}\t{}\t{}\t{:.3f}\t{:.3f}\t{}\t{}\n".format(
-                                   nodefrom, nodeto, site, traitfrom, traitto,
+                                outfile.write("{}\t{}\t{}\t{}\t{}\t{}\t{:.3f}\t{:.3f}\t{}\t{}\n".format(
+                                   nodefrom, nodeto, blen, site, traitfrom, traitto,
                                    traitprobfrom, traitprobto, resfrom, resto))
 
 ###################################################################################################
