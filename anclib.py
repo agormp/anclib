@@ -71,6 +71,21 @@ class AncRecon:
 
     ###############################################################################################
 
+    def write_nodeidtree(self, outfilename):
+        """Prints Nexus tree to outfilename, where labels are nodeIDs
+        This means they should be interpreted as belonging to the child node, not the branch"""
+
+        # Hack: add label for root manually
+        out_tree = self.tree.copy_treeobject(copylabels=False)
+        out_tree.set_nodeid_labels()
+        treestring = out_tree.nexus()
+        rootid = str(out_tree.root)
+        treestring = treestring.replace(");", f"){rootid};")
+        with open(outfilename, "w") as outfile:
+            outfile.write(treestring)
+
+    ###############################################################################################
+
     def nodeinfo(self, outfilename, varseq=False, poslist=None, zeroindex=True, probmin=None,
                  translate=False):
         """Writes results to 'outfilename':
@@ -493,6 +508,7 @@ class MBASRTrait:
 ###################################################################################################
 
 class _TreeTime:
+    """Abstract baseclass - do not instantiate"""
 
     def _parsetreefile(self, treefile):
         with pt.Nexustreefile(treefile) as tf:
