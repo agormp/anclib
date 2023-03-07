@@ -36,38 +36,31 @@ class AncRecon:
     (100% for leaves, possibly less for internal nodes)
 
     Object can output information about nodes, branches, changes, etc.
+
+    Internal node IDs are set to be the same as in the anctrait object
+
+    NOTE: in state of transition. Currently does not get seqprob
     """
 
     def __init__(self, ancseq, anctrait):
-        self.tree = ancseq.tree
-        self.alignment = ancseq.alignment
-        if hasattr(ancseq, "seqprob"):
-            self.seqprob = ancseq.seqprob
-        else:
-            self.seqprob = None # Python note: should I set to zeroes?
+        self.tree = anctrait.tree
+        self.traitdict = anctrait.traitdict
+        self.traitprob = anctrait.traitprob    # Python note: Always there?
+
         self.sortedintnodes = sorted(list(self.tree.intnodes))
         self.sortednodes = sorted(list(self.tree.leaves))
         self.sortednodes.extend(self.sortedintnodes)
 
-        trait_tree = anctrait.tree
-        orig_traitdict = anctrait.traitdict
-        orig_traitprob = anctrait.traitprob    # Python note: Always there?
-
-        self.traitdict, self.traitprob = self._match_traitid_seqid(self.tree, trait_tree,
-                                                            orig_traitdict, orig_traitprob)
-
-    ###########################################################################################
-
-    def _match_traitid_seqid(self, seqtree, trait_tree, traitdict, traitprob):
-        trateid2seqid,unmatch1,unmatch2 = trait_tree.match_nodes(seqtree)
-        if (unmatch1 != None) or (unmatch2 != None):
+        seqid2traitid, u1, u2 = ancseq.tree.match_nodes(self.tree)
+        if (u1 != None) or (u2 != None):
             raise AncError("Seq-tree and trait-tree are rooted differently. Cannot merge info")
-        new_traitdict = {}
-        new_traitprob = {}
-        for trateid,seqid in trateid2seqid.items():
-            new_traitdict[seqid] = traitdict[trateid]
-            new_traitprob[seqid] = traitprob[trateid]
-        return new_traitdict, new_traitprob
+
+        self.alignment = sequencelib.Seq_alignment(seqtype=ancseq.alignment.seqtype)
+        for seq in ancseq.alignment:
+            seqid = ancseq.name2id[seq.name]  # Python note: not this objects responsibility!!!
+            newname = str(seqid2traitid[seqid])
+            seq.rename(newname)
+            self.alignment.addseq(seq)
 
     ###############################################################################################
 
@@ -413,13 +406,9 @@ class BasemlSeq:
 class MBASRTrait:
     """Class representing parser for MBASR ancestral reconstruction file.
 
-    Methods for extracing one tree and one alignment of ancestral (and contemporaneous) sequences.
-
-    Tree is constructed based on branch info (87..88 87..89 etc.) and newick string.
-    Internal nodes are numbered according to branch info. Leaves are named from Newick string.
-
-    Ancestral sequences (corresponding to internal nodes on tree) are named based on nodeIDs.
-    The method also returns
+    Methods for extracing a tree and one reconstructed trait, with trait probabilities.
+    Parsing tree requires R and the R-packages ape and tidytree (called from python, via rpy2).
+    The extracted tree has the same internal node numbers as used in output from MBASR
     """
 
     def __init__(self, treefile, intnodefile, leafstatefile, state0, state1):
@@ -539,19 +528,22 @@ class _TreeTime:
 class TreeTimeSeq(_TreeTime):
 
     def __init__(self, ancseqfile, seq_treefile):
-        self.tree, self.seqname2id = self._parsetreefile(seq_treefile)
-        self.alignment = self._parsealignfile(ancseqfile, self.tree, self.seqname2id)
+        self.tree, self.origseqname2id = self._parsetreefile(seq_treefile)
+        self.alignment, self.name2id = self._parsealignfile(ancseqfile, self.tree, self.origseqname2id)
 
     ###########################################################################################
 
-    def _parsealignfile(self, alignfile, tree, name2id):
+    def _parsealignfile(self, alignfile, tree, origname2id):
         """Reads alignment; returns alignment with nodes renamed to match nodes on seqtree"""
         sf = sequencelib.Seqfile(alignfile)
         alignment = sf.read_alignment()
+        name2id = {}
         for origname in alignment.seqnamelist.copy():
-            newname = str(name2id[origname])
+            newid = origname2id[origname]
+            newname = str(newid)
+            name2id[newname] = newid
             alignment.changeseqname(origname, newname)
-        return alignment
+        return alignment, name2id
 
 ###################################################################################################
 ###################################################################################################
