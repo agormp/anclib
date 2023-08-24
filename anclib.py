@@ -497,7 +497,7 @@ class MBASRTrait:
 ###################################################################################################
 
 class _TreeTime:
-    """Abstract baseclass - do not instantiate"""
+    """Baseclass - do not instantiate"""
 
     def _parsetreefile(self, treefile):
         with pt.Nexustreefile(treefile) as tf:
