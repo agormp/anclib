@@ -57,16 +57,44 @@ class AncRecon:
 
     ###############################################################################################
 
-    def write_nodeidtree(self, outfilename):
-        """Prints Nexus tree to outfilename, where labels are nodeIDs
-        This means they should be interpreted as belonging to the child node, not the branch"""
+    def write_tree(self, outfilename, label="branchtype", br=1):
+        """Prints Nexus tree to outfilename, where branch labels carry information:
 
-        # Hack: add label for root manually
+        label="branchtype": labels give same inforamtion as branchtype in branchinfo and
+        branchdiff, namely traits for parent, nodefrom, nodeto (e.g., human-swine-swine)
+
+        label="nodeid": nodeid used in other output functions (This means labels should
+        be interpreted as belonging to the child node, not the branch)"""
+
         out_tree = self.tree.copy_treeobject(copylabels=False)
-        out_tree.set_nodeid_labels()
-        treestring = out_tree.nexus()
-        rootid = str(out_tree.root)
-        treestring = treestring.replace(");", f"){rootid};")
+
+        if label == "branchtype":
+            for nodefrom in out_tree.intnodes:
+                for nodeto in out_tree.children(nodefrom):
+                    traitfrom = self.traitdict[nodefrom]
+                    traitto = self.traitdict[nodeto]
+                    if br==1:
+                        branch_type = f"{traitfrom}-{traitto}"
+                    elif br==2:
+                        if nodefrom != self.tree.root:
+                            parent = self.tree.parent(nodefrom)
+                            traitfrom_parent = self.traitdict[parent]
+                        else:
+                            traitfrom_parent = "None"
+                        branch_type = f"{traitfrom_parent}-{traitfrom}-{traitto}"
+                    out_tree.setlabel(nodefrom, nodeto, branch_type)
+            treestring = out_tree.nexus()
+        elif label == "nodeid":
+            # Hack: add label for root manually
+            out_tree.set_nodeid_labels()
+            treestring = out_tree.nexus()
+            rootid = str(out_tree.root)
+            treestring = treestring.replace(");", f"){rootid};")
+        else:
+            raise AncError("'label' must be 'branchtype' or 'nodeid'")
+
+        print(out_tree) #DEBUG
+
         with open(outfilename, "w") as outfile:
             outfile.write(treestring)
 
@@ -115,24 +143,28 @@ class AncRecon:
 
     def branchinfo(self, outfilename, varseq=False, poslist=None, zeroindex=True,
                     printif_traitdiff=False, printif_seqdiff=False, probmin=None,
-                    translate=False):
+                    translate=False, br=1):
         """Writes results to 'outfilename':
         Outputs one line per branch with following informations:
           nodeid_from  nodeid_to  branchlen trait_from  trait_to
                                             traitprob_from  traitprob_to seq_from  seq_to
-        Option varseq=True (default) output only variable sites from sequences.
-        Option poslist: specify sites to be printed.
-        Option zeroindex=True: Start indexing of poslist at 0 (otherwise start at 1)
-        Option printif_traitdiff=True: only print branches where traits differ
-        Option printif_seqdiff=True: only print branches where selected residues have changed
-        option probmin (if not None): Only print info where both nodes have traitprob > probmin
-        option translate: Translate DNA to amino acid sequences. Note position info is now for aa
+                                            branchtype
+
+        varseq=True (default) output only variable sites from sequences.
+        poslist: specify sites to be printed.
+        zeroindex=True: Start indexing of poslist at 0 (otherwise start at 1)
+        printif_traitdiff=True: only print branches where traits differ
+        printif_seqdiff=True: only print branches where selected residues have changed
+        probmin (if not None): Only print info where both nodes have traitprob > probmin
+        translate: Translate DNA to amino acid sequences. Note position info is now for aa
+        br=1: branchtype 1st degree traits: node_from to nodeto (hu-sw)
+        br=2: branchtype 2nd degree traits: parent to node_from to nodeto (hu-hu-sw)
         """
 
         with open(outfilename, "w") as outfile:
-            outfile.write("# {}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(
+            outfile.write("# {}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(
                    "node_from", "node_to", "branch_len", "trait_from", "trait_to",
-                   "traitprob_from", "traitprob_to", "seq_from", "seq_to"))
+                   "traitprob_from", "traitprob_to", "seq_from", "seq_to", "branch_type"))
             pos = None
             if varseq and poslist:
                 raise AncError("Specify either varseq or poslist option - not both")
@@ -158,6 +190,15 @@ class AncRecon:
                         blen = self.tree.nodedist(nodefrom, nodeto)
                         traitfrom = self.traitdict[nodefrom]
                         traitto = self.traitdict[nodeto]
+                        if br==1:
+                            branch_type = f"{traitfrom}-{traitto}"
+                        elif br==2:
+                            if nodefrom != self.tree.root:
+                                parent = self.tree.parent(nodefrom)
+                                traitfrom_parent = self.traitdict[parent]
+                            else:
+                                traitfrom_parent = "None"
+                            branch_type = f"{traitfrom_parent}-{traitfrom}-{traitto}"
                         traitprobfrom = self.traitprob[nodefrom]
                         traitprobto = self.traitprob[nodeto]
                         if pos:
@@ -174,18 +215,19 @@ class AncRecon:
                         if printif_seqdiff and (seqfrom==seqto):
                             printbranch = False
                         if printbranch:
-                            outfile.write("{}\t{}\t{}\t{}\t{}\t{:.3f}\t{:.3f}\t{}\t{}\n".format(
+                            outfile.write("{}\t{}\t{}\t{}\t{}\t{:.3f}\t{:.3f}\t{}\t{}\t{}\n".format(
                                    nodefrom, nodeto, blen, traitfrom, traitto,
-                                   traitprobfrom, traitprobto, seqfrom, seqto))
+                                   traitprobfrom, traitprobto, seqfrom, seqto, branch_type))
 
     ###############################################################################################
 
     def branchdiff(self, outfilename, zeroindex=True, printif_traitdiff=False, probmin=None,
-                   translate=False):
+                   translate=False, br=1):
         """Writes results to 'outfilename':
         Output is one line of output for each sequence change, on all branches of the tree:
             node_from, node_to, branch_len, site, trait_from, trait_to,
-                                      traitprob_from, traitprob_to, residue_from, residue_to
+                                      traitprob_from, traitprob_to, residue_from, residue_to,
+
         Here 'site' is the index of the sequence residue.
         Option zeroindex=False causes numbering to start at 1 (otherwise at 0)
         Option printif_traitdiff=True: only print branches where traits differ
@@ -194,9 +236,9 @@ class AncRecon:
         """
 
         with open(outfilename, "w") as outfile:
-            outfile.write("# {}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(
+            outfile.write("# {}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(
                "node_from", "node_to", "branch_len", "seqpos", "trait_from", "trait_to",
-               "traitprob_from", "traitprob_to", "residue_from", "residue_to"))
+               "traitprob_from", "traitprob_to", "residue_from", "residue_to", "branch_type"))
             if translate:
                 alignment = self.alignment.translate()
             else:
@@ -211,6 +253,15 @@ class AncRecon:
                         blen = self.tree.nodedist(nodefrom, nodeto)
                         traitfrom = self.traitdict[nodefrom]
                         traitto = self.traitdict[nodeto]
+                        if br==1:
+                            branch_type = f"{traitfrom}-{traitto}"
+                        elif br==2:
+                            if nodefrom != self.tree.root:
+                                parent = self.tree.parent(nodefrom)
+                                traitfrom_parent = self.traitdict[parent]
+                            else:
+                                traitfrom_parent = "None"
+                            branch_type = f"{traitfrom_parent}-{traitfrom}-{traitto}"
                         traitprobfrom = self.traitprob[nodefrom]
                         traitprobto = self.traitprob[nodeto]
                         seqfrom = alignment.getseq(seqnamefrom)
@@ -220,9 +271,9 @@ class AncRecon:
                         # Could test for traitdiff before setting seq, but neater code this way...
                         if (not printif_traitdiff) or (traitfrom!=traitto):
                             for site,resfrom,resto in difflist:
-                                outfile.write("{}\t{}\t{}\t{}\t{}\t{}\t{:.3f}\t{:.3f}\t{}\t{}\n".format(
+                                outfile.write("{}\t{}\t{}\t{}\t{}\t{}\t{:.3f}\t{:.3f}\t{}\t{}\t{}\n".format(
                                    nodefrom, nodeto, blen, site, traitfrom, traitto,
-                                   traitprobfrom, traitprobto, resfrom, resto))
+                                   traitprobfrom, traitprobto, resfrom, resto, branch_type))
 
 ###################################################################################################
 ###################################################################################################
