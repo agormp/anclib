@@ -93,8 +93,6 @@ class AncRecon:
         else:
             raise AncError("'label' must be 'branchtype' or 'nodeid'")
 
-        print(out_tree) #DEBUG
-
         with open(outfilename, "w") as outfile:
             outfile.write(treestring)
 
