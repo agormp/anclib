@@ -469,7 +469,7 @@ class _TreeTime:
                 name2id[nodename] = child
         # Add nodename for root (which was listed at end of treestring)
         # a bit hackish, since I know there is a nodename and a branchlen: NODE_0000000:0.00100
-        rootname = re.sub(":[0-9]\.[0-9]+", "", tree.belowroot)
+        rootname = re.sub(":[0-9]\.[0-9]+", "", tree.below_root)
         name2id[rootname] = tree.root
         return name2id
 
@@ -509,7 +509,7 @@ class TreeTimeTrait(_TreeTime):
     ###########################################################################################
 
     def _parsetraits(self, trait_treefile, trait_probfile, trait_tree, traitname2id):
-        traitdict = self._parse_annot_tree(trait_treefile, traitname2id) # This dict has no root entry
+        traitdict = self._parse_annot_tree(trait_treefile, traitname2id)
         traitprob, traitid2AB = self._parse_CSV(trait_probfile, traitname2id)
         traitdict = self._match_AB_trait(traitid2AB, traitdict, trait_tree)   # Add root trait. Check consistency
         return traitdict, traitprob
@@ -531,7 +531,6 @@ class TreeTimeTrait(_TreeTime):
                     treestring += line
         treestring = treestring.replace("\n", "")
         nodenames = re.findall(r"[\(\),]([^\(\),:]+):", treestring)
-        nodenames = nodenames[:-1]    # One too long: no trait for root node for some reason
         traits = re.findall(r'\[&[\w]+=\"(\w+)\"\]', treestring)
 
         traitdict = {}
@@ -575,9 +574,6 @@ class TreeTimeTrait(_TreeTime):
         else:
             AB2trait["A"] = other_trait
             AB2trait["B"] = traitval
-        root_ABtrait = traitid2AB[trait_tree.root]
-        root_trait = AB2trait[root_ABtrait]
-        traitdict[trait_tree.root] = root_trait
         self._check_trait_consistency(AB2trait, traitid2AB, traitdict)
         return traitdict
 
