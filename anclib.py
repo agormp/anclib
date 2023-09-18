@@ -57,7 +57,7 @@ class AncRecon:
 
     ###############################################################################################
 
-    def write_tree(self, outfilename, label="branchtype", br=1):
+    def write_tree(self, outfilename, label="branchtype", br=1, label_delimiters="braces"):
         """Prints Nexus tree to outfilename, where branch labels carry information:
 
         label="branchtype": labels give same inforamtion as branchtype in branchinfo and
@@ -83,7 +83,7 @@ class AncRecon:
                             traitfrom_parent = "None"
                         branch_type = f"{traitfrom_parent}-{traitfrom}-{traitto}"
                     out_tree.setlabel(nodefrom, nodeto, branch_type)
-            treestring = out_tree.nexus()
+            treestring = out_tree.nexus(print_leaflabels=True, label_delimiters=label_delimiters)
         elif label == "nodeid":
             # Hack: add label for root manually
             out_tree.set_nodeid_labels()
