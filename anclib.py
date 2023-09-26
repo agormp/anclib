@@ -219,28 +219,42 @@ class AncRecon:
 
     ###############################################################################################
 
-    def branchdiff(self, outfilename, zeroindex=True, printif_traitdiff=False, probmin=None,
-                   translate=False, br=1):
+    def branchdiff(self, outfilename, varseq=False, poslist=None, zeroindex=False,
+                   printif_traitdiff=False, probmin=None, translate=False, br=1):
         """Writes results to 'outfilename':
         Output is one line of output for each sequence change, on all branches of the tree:
             node_from, node_to, branch_len, site, trait_from, trait_to,
-                                      traitprob_from, traitprob_to, residue_from, residue_to,
+            traitprob_from, traitprob_to, residue_from, residue_to, branch_type
 
         Here 'site' is the index of the sequence residue.
-        Option zeroindex=False causes numbering to start at 1 (otherwise at 0)
-        Option printif_traitdiff=True: only print branches where traits differ
-        Option probmin (if not None): Only print info where both nodes have traitprob > probmin
-        Option translate: Translate DNA to amino acid sequences. Note position info is now for aa
+        varseq=True: output only variable sites from sequences (default: print all sites)
+        poslist: specify sites to be printed (default: print all sites)
+        zeroindex=False causes numbering to start at 1 (otherwise at 0)
+        printif_traitdiff=True: only print branches where traits differ
+        probmin (if not None): Only print info where both nodes have traitprob > probmin
+        translate: Translate DNA to amino acid sequences. Note position info is now for aa
         """
 
         with open(outfilename, "w") as outfile:
             outfile.write("# {}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(
                "node_from", "node_to", "branch_len", "seqpos", "trait_from", "trait_to",
                "traitprob_from", "traitprob_to", "residue_from", "residue_to", "branch_type"))
+
+            # Ensure that we have variable poslist, which contains zero-indexed alignment positions
+            if varseq and poslist:
+                raise AncError("Specify either varseq or poslist option - not both")
+            elif not varseq and not poslist:
+                poslist = list(range(self.alignment.alignlen()))
+            elif poslist and not zeroindex:
+                poslist = [p - 1 for p in poslist]
+            elif varseq:
+                poslist = self.alignment.varcols()
+
             if translate:
                 alignment = self.alignment.translate()
             else:
                 alignment = self.alignment
+
             for nodefrom in self.sortedintnodes:
                 for nodeto in self.tree.children(nodefrom):
                     if (not probmin) or (
@@ -262,13 +276,18 @@ class AncRecon:
                             branch_type = f"{traitfrom_parent}-{traitfrom}-{traitto}"
                         traitprobfrom = self.traitprob[nodefrom]
                         traitprobto = self.traitprob[nodeto]
-                        seqfrom = alignment.getseq(seqnamefrom)
-                        seqto = alignment.getseq(seqnameto)
-                        difflist = seqfrom.seqdiff(seqto, zeroindex)
+                        seqfrom = alignment.getseq(seqnamefrom).seq
+                        seqto = alignment.getseq(seqnameto).seq
 
                         # Could test for traitdiff before setting seq, but neater code this way...
                         if (not printif_traitdiff) or (traitfrom!=traitto):
-                            for site,resfrom,resto in difflist:
+                            respairlist = list(zip(seqfrom,seqto))
+                            for seqpos in poslist:
+                                resfrom,resto = respairlist[seqpos]
+                                if not zeroindex:
+                                    site = seqpos + 1
+                                else:
+                                    site = seqpos
                                 outfile.write("{}\t{}\t{}\t{}\t{}\t{}\t{:.3f}\t{:.3f}\t{}\t{}\t{}\n".format(
                                    nodefrom, nodeto, blen, site, traitfrom, traitto,
                                    traitprobfrom, traitprobto, resfrom, resto, branch_type))
