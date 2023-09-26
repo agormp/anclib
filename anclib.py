@@ -139,7 +139,7 @@ class AncRecon:
 
     ###############################################################################################
 
-    def branchinfo(self, outfilename, varseq=False, poslist=None, zeroindex=True,
+    def branchinfo(self, outfilename, varseq=False, poslist=None, zeroindex=False,
                     printif_traitdiff=False, printif_seqdiff=False, probmin=None,
                     translate=False, br=1):
         """Writes results to 'outfilename':
@@ -148,8 +148,8 @@ class AncRecon:
                                             traitprob_from  traitprob_to seq_from  seq_to
                                             branchtype
 
-        varseq=True (default) output only variable sites from sequences.
-        poslist: specify sites to be printed.
+        varseq=True: output only variable sites from sequences (default: print all sites)
+        poslist: specify sites to be printed (default: print all sites)
         zeroindex=True: Start indexing of poslist at 0 (otherwise start at 1)
         printif_traitdiff=True: only print branches where traits differ
         printif_seqdiff=True: only print branches where selected residues have changed
