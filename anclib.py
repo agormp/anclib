@@ -240,20 +240,21 @@ class AncRecon:
                "node_from", "node_to", "branch_len", "seqpos", "trait_from", "trait_to",
                "traitprob_from", "traitprob_to", "residue_from", "residue_to", "branch_type"))
 
-            # Ensure that we have variable poslist, which contains zero-indexed alignment positions
-            if varseq and poslist:
-                raise AncError("Specify either varseq or poslist option - not both")
-            elif not varseq and not poslist:
-                poslist = list(range(self.alignment.alignlen()))
-            elif poslist and not zeroindex:
-                poslist = [p - 1 for p in poslist]
-            elif varseq:
-                poslist = self.alignment.varcols()
-
             if translate:
                 alignment = self.alignment.translate()
             else:
                 alignment = self.alignment
+
+            # Ensure that we have the variable poslist
+            # and that it contains zero-indexed alignment positions
+            if varseq and poslist:
+                raise AncError("Specify either varseq or poslist option - not both")
+            elif not varseq and not poslist:
+                poslist = list(range(alignment.alignlen()))
+            elif poslist and not zeroindex:
+                poslist = [p - 1 for p in poslist]
+            elif varseq:
+                poslist = alignment.varcols()
 
             for nodefrom in self.sortedintnodes:
                 for nodeto in self.tree.children(nodefrom):
