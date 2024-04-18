@@ -233,6 +233,8 @@ class AncRecon:
         printif_traitdiff=True: only print branches where traits differ
         probmin (if not None): Only print info where both nodes have traitprob > probmin
         translate: Translate DNA to amino acid sequences. Note position info is now for aa
+        br=1: branchtype 1st degree traits: node_from to nodeto (hu-sw)
+        br=2: branchtype 2nd degree traits: parent to node_from to nodeto (hu-hu-sw)
         """
 
         with open(outfilename, "w") as outfile:
