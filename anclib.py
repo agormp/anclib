@@ -220,7 +220,7 @@ class AncRecon:
                         if printbranch:
                             outfile.write("{}\t{}\t{}\t{}\t{}\t{:.3f}\t{:.3f}\t{}\t{}\t{}\t{}\n".format(
                                    nodefrom, nodeto, blen, traitfrom, traitto,
-                                   traitprobfrom, traitprobto, seqfrom, seqto, branch_type))
+                                   traitprobfrom, traitprobto, seqfrom, seqto, branch_type, external))
 
     ###############################################################################################
 
@@ -303,7 +303,7 @@ class AncRecon:
                                     site = seqpos
                                 outfile.write("{}\t{}\t{}\t{}\t{}\t{}\t{:.3f}\t{:.3f}\t{}\t{}\t{}\t{}\n".format(
                                    nodefrom, nodeto, blen, site, traitfrom, traitto,
-                                   traitprobfrom, traitprobto, resfrom, resto, branch_type))
+                                   traitprobfrom, traitprobto, resfrom, resto, branch_type, external))
 
 ###################################################################################################
 ###################################################################################################
