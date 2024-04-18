@@ -160,9 +160,10 @@ class AncRecon:
         """
 
         with open(outfilename, "w") as outfile:
-            outfile.write("# {}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(
+            outfile.write("# {}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(
                    "node_from", "node_to", "branch_len", "trait_from", "trait_to",
-                   "traitprob_from", "traitprob_to", "seq_from", "seq_to", "branch_type"))
+                   "traitprob_from", "traitprob_to", "seq_from", "seq_to", "branch_type",
+                   "external"))
             pos = None
             if varseq and poslist:
                 raise AncError("Specify either varseq or poslist option - not both")
@@ -188,6 +189,10 @@ class AncRecon:
                         blen = self.tree.nodedist(nodefrom, nodeto)
                         traitfrom = self.traitdict[nodefrom]
                         traitto = self.traitdict[nodeto]
+                        if nodeto in self.tree.leaves:
+                            external=1
+                        else:
+                            external=0
                         if br==1:
                             branch_type = f"{traitfrom}-{traitto}"
                         elif br==2:
@@ -213,7 +218,7 @@ class AncRecon:
                         if printif_seqdiff and (seqfrom==seqto):
                             printbranch = False
                         if printbranch:
-                            outfile.write("{}\t{}\t{}\t{}\t{}\t{:.3f}\t{:.3f}\t{}\t{}\t{}\n".format(
+                            outfile.write("{}\t{}\t{}\t{}\t{}\t{:.3f}\t{:.3f}\t{}\t{}\t{}\t{}\n".format(
                                    nodefrom, nodeto, blen, traitfrom, traitto,
                                    traitprobfrom, traitprobto, seqfrom, seqto, branch_type))
 
@@ -238,9 +243,10 @@ class AncRecon:
         """
 
         with open(outfilename, "w") as outfile:
-            outfile.write("# {}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(
+            outfile.write("# {}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(
                "node_from", "node_to", "branch_len", "seqpos", "trait_from", "trait_to",
-               "traitprob_from", "traitprob_to", "residue_from", "residue_to", "branch_type"))
+               "traitprob_from", "traitprob_to", "residue_from", "residue_to", "branch_type",
+               "external"))
 
             if translate:
                 alignment = self.alignment.translate()
@@ -268,6 +274,10 @@ class AncRecon:
                         blen = self.tree.nodedist(nodefrom, nodeto)
                         traitfrom = self.traitdict[nodefrom]
                         traitto = self.traitdict[nodeto]
+                        if nodeto in self.tree.leaves:
+                            external=1
+                        else:
+                            external=0
                         if br==1:
                             branch_type = f"{traitfrom}-{traitto}"
                         elif br==2:
@@ -291,7 +301,7 @@ class AncRecon:
                                     site = seqpos + 1
                                 else:
                                     site = seqpos
-                                outfile.write("{}\t{}\t{}\t{}\t{}\t{}\t{:.3f}\t{:.3f}\t{}\t{}\t{}\n".format(
+                                outfile.write("{}\t{}\t{}\t{}\t{}\t{}\t{:.3f}\t{:.3f}\t{}\t{}\t{}\t{}\n".format(
                                    nodefrom, nodeto, blen, site, traitfrom, traitto,
                                    traitprobfrom, traitprobto, resfrom, resto, branch_type))
 
