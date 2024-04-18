@@ -337,7 +337,7 @@ class BasemlSeq:
         self.newicknumbers = self.rstfile.readline()
 
         # Find line with pattern like "   88..89  88..90"
-        tmp,_ = self._read_until("^\s*[0-9]+\.\.[0-9]+\s*[0-9]+\.\.[0-9]+", nsave=1)
+        tmp,_ = self._read_until(r"^\s*[0-9]+\.\.[0-9]+\s*[0-9]+\.\.[0-9]+", nsave=1)
         self.branchlist = tmp[0].strip().split()
 
         tmp,_ = self._read_until("^Nodes [0-9]+ to [0-9]+ are ancestral", nsave=1)
@@ -345,7 +345,7 @@ class BasemlSeq:
 
         # Find first line of seqinfo. Pattern like "   1     86   AAAAAAAAAAAAA"
         # Then find last line of seqinfo to get seqlen
-        _,self.startofseqpos = self._read_until("^\s*1\s+[0-9]+\s+[A-Z]+")
+        _,self.startofseqpos = self._read_until(r"^\s*1\s+[0-9]+\s+[A-Z]+")
         tmp,_ = self._read_until("^\n",nsave=2)
         self.seqlen = int(tmp[0].split()[0])
 
@@ -365,8 +365,8 @@ class BasemlSeq:
     def _map_nodeid_nodenum(self):
 
         # Assumes the two newick strings in rst are in the same order
-        leaflist = re.sub(",|;|\(|\)|: [0-9]\.[0-9]+", "", self.newicknames).split()
-        numtmp = re.sub(",|;|\(|\)", "", self.newicknumbers).split()
+        leaflist = re.sub(r",|;|\(|\)|: [0-9]\.[0-9]+", "", self.newicknames).split()
+        numtmp = re.sub(r",|;|\(|\)", "", self.newicknumbers).split()
         numberlist = [int(x) for x in numtmp]
         nodenum2nodeid = dict(zip(numberlist, leaflist))
         for nodenum in range(max(numberlist) + 1, self.nseq + 1):
@@ -499,7 +499,7 @@ class _TreeTime:
                 name2id[nodename] = child
         # Add nodename for root (which was listed at end of treestring)
         # a bit hackish, since I know there is a nodename and a branchlen: NODE_0000000:0.00100
-        rootname = re.sub(":[0-9]\.[0-9]+", "", tree.below_root)
+        rootname = re.sub(r":[0-9]\.[0-9]+", "", tree.below_root)
         name2id[rootname] = tree.root
         return name2id
 
